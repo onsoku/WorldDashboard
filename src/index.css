@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* ===== Theme CSS Variables ===== */
+
+:root, [data-theme="light"] {
+  --color-bg: #f9fafb;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-header: rgba(255,255,255,0.8);
+  --color-bg-hover: #f3f4f6;
+  --color-bg-active: #eef2ff;
+  --color-bg-input: #ffffff;
+  --color-bg-badge-blue: #dbeafe;
+  --color-bg-badge-green: #d1fae5;
+  --color-bg-badge-amber: #fef3c7;
+  --color-bg-badge-purple: #ede9fe;
+  --color-bg-info: #eff6ff;
+  --color-bg-progress: #f3f4f6;
+  --color-text: #111827;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #9ca3af;
+  --color-text-link: #4f46e5;
+  --color-text-link-hover: #3730a3;
+  --color-text-info: #1e40af;
+  --color-border: #e5e7eb;
+  --color-border-active: #4f46e5;
+  --color-border-info: #bfdbfe;
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-light: #eef2ff;
+  --color-primary-text: #4338ca;
+  --color-success: #059669;
+  --color-success-light: #d1fae5;
+  --color-error: #dc2626;
+  --color-error-light: #fef2f2;
+  --color-warning: #d97706;
+  --color-warning-light: #fffbeb;
+}
+
+[data-theme="dark"] {
+  --color-bg: #0f1117;
+  --color-bg-card: #1a1d27;
+  --color-bg-sidebar: #141620;
+  --color-bg-header: rgba(20,22,32,0.85);
+  --color-bg-hover: #252836;
+  --color-bg-active: #1e2244;
+  --color-bg-input: #1a1d27;
+  --color-bg-badge-blue: #1e3a5f;
+  --color-bg-badge-green: #14412a;
+  --color-bg-badge-amber: #422d08;
+  --color-bg-badge-purple: #2e1e5e;
+  --color-bg-info: #172554;
+  --color-bg-progress: #252836;
+  --color-text: #f3f4f6;
+  --color-text-secondary: #d1d5db;
+  --color-text-muted: #6b7280;
+  --color-text-link: #818cf8;
+  --color-text-link-hover: #a5b4fc;
+  --color-text-info: #93c5fd;
+  --color-border: #2e3040;
+  --color-border-active: #818cf8;
+  --color-border-info: #1e3a5f;
+  --color-primary: #818cf8;
+  --color-primary-hover: #6366f1;
+  --color-primary-light: #1e2244;
+  --color-primary-text: #a5b4fc;
+  --color-success: #34d399;
+  --color-success-light: #14412a;
+  --color-error: #f87171;
+  --color-error-light: #3b1111;
+  --color-warning: #fbbf24;
+  --color-warning-light: #422d08;
+}
+
+[data-theme="mono"] {
+  --color-bg: #fafafa;
+  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #f5f5f5;
+  --color-bg-header: rgba(250,250,250,0.85);
+  --color-bg-hover: #f0f0f0;
+  --color-bg-active: #e8e8e8;
+  --color-bg-input: #ffffff;
+  --color-bg-badge-blue: #e5e5e5;
+  --color-bg-badge-green: #e5e5e5;
+  --color-bg-badge-amber: #e5e5e5;
+  --color-bg-badge-purple: #e5e5e5;
+  --color-bg-info: #f0f0f0;
+  --color-bg-progress: #e5e5e5;
+  --color-text: #1a1a1a;
+  --color-text-secondary: #525252;
+  --color-text-muted: #a3a3a3;
+  --color-text-link: #171717;
+  --color-text-link-hover: #000000;
+  --color-text-info: #404040;
+  --color-border: #d4d4d4;
+  --color-border-active: #171717;
+  --color-border-info: #d4d4d4;
+  --color-primary: #171717;
+  --color-primary-hover: #000000;
+  --color-primary-light: #f0f0f0;
+  --color-primary-text: #171717;
+  --color-success: #404040;
+  --color-success-light: #f0f0f0;
+  --color-error: #525252;
+  --color-error-light: #f5f5f5;
+  --color-warning: #525252;
+  --color-warning-light: #f5f5f5;
+}
+
+/* ===== Theme Utility Classes ===== */
+
+@utility theme-bg { background-color: var(--color-bg); }
+@utility theme-bg-card { background-color: var(--color-bg-card); }
+@utility theme-bg-sidebar { background-color: var(--color-bg-sidebar); }
+@utility theme-bg-header { background-color: var(--color-bg-header); }
+@utility theme-bg-hover { background-color: var(--color-bg-hover); }
+@utility theme-bg-active { background-color: var(--color-bg-active); }
+@utility theme-bg-input { background-color: var(--color-bg-input); }
+@utility theme-bg-info { background-color: var(--color-bg-info); }
+@utility theme-bg-progress { background-color: var(--color-bg-progress); }
+@utility theme-text { color: var(--color-text); }
+@utility theme-text-secondary { color: var(--color-text-secondary); }
+@utility theme-text-muted { color: var(--color-text-muted); }
+@utility theme-text-link { color: var(--color-text-link); }
+@utility theme-text-info { color: var(--color-text-info); }
+@utility theme-border { border-color: var(--color-border); }
+@utility theme-border-active { border-color: var(--color-border-active); }
+@utility theme-border-info { border-color: var(--color-border-info); }
+@utility theme-primary { background-color: var(--color-primary); }
+@utility theme-primary-text { color: var(--color-primary-text); }
+@utility theme-primary-light { background-color: var(--color-primary-light); }
+
+@utility theme-ring {
+  --tw-ring-color: var(--color-primary);
+}
