@@ -4,6 +4,23 @@
 
 [日本語](./docs/README.ja.md) | [中文](./docs/README.zh.md) | [Español](./docs/README.es.md) | [Italiano](./docs/README.it.md) | [Français](./docs/README.fr.md)
 
+## Screenshots
+
+### Light Theme
+![Light Theme](./docs/screenshots/light-overview.png)
+
+### Dark Theme
+![Dark Theme](./docs/screenshots/dark-overview.png)
+
+### Monochrome Theme
+![Monochrome Theme](./docs/screenshots/mono-overview.png)
+
+### Keyword Map & Sources
+![Keywords](./docs/screenshots/light-keywords.png)
+
+### English UI
+![English](./docs/screenshots/light-english.png)
+
 ## Features
 
 - **AI Research Agent** — Claude Code automatically searches the web and academic databases (Semantic Scholar) for any topic
