@@ -281,13 +281,14 @@ export function researchApiPlugin(): Plugin {
           req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
           req.on('end', () => {
             try {
-              const { topic, language, parentSlug } = JSON.parse(body);
+              const { topic, language, parentSlug, mode, slug: existingSlug } = JSON.parse(body);
               if (!topic || typeof topic !== 'string') {
                 res.statusCode = 400;
                 res.end(JSON.stringify({ error: 'topic is required' }));
                 return;
               }
               const lang: string = language ?? 'ja';
+              const isUpdate = mode === 'update' && existingSlug;
 
               const jobId = toSlug(topic) + '-' + Date.now();
 
@@ -339,10 +340,55 @@ export function researchApiPlugin(): Plugin {
                 ? `\nThis research is a drilldown from parent topic (parentSlug: "${parentSlug}"). Include "parentSlug": "${parentSlug}" in the meta object of the output JSON.\n`
                 : '';
 
+              // For update mode, load existing data and build version history
+              let updateBlock = '';
+              if (isUpdate) {
+                try {
+                  const existingPath = path.join(dataDir, `${existingSlug}.json`);
+                  const existingData = readFileSync(existingPath, 'utf-8');
+                  const parsed = JSON.parse(existingData);
+                  // Build version entry from current data
+                  const currentVersion = {
+                    version: (parsed.versions?.length ?? 0) + 1,
+                    createdAt: parsed.meta?.createdAt ?? new Date().toISOString(),
+                    overview: parsed.overview,
+                    keywords: parsed.keywords,
+                    webSources: parsed.webSources,
+                    academicPapers: parsed.academicPapers,
+                    statistics: parsed.statistics,
+                    extensions: parsed.extensions,
+                  };
+                  const versions = [...(parsed.versions ?? []), currentVersion];
+                  updateBlock = [
+                    '',
+                    '=== UPDATE MODE ===',
+                    `This is an UPDATE to an existing topic (slug: "${existingSlug}").`,
+                    'IMPORTANT INSTRUCTIONS FOR UPDATE MODE:',
+                    '1. Read the existing data below carefully',
+                    '2. Search for NEW information that has emerged since the last update',
+                    '3. Keep all existing content and ADD new findings, sources, and keywords',
+                    '4. If any previous facts are now known to be incorrect, add a "corrections" array:',
+                    '   [{"target": "what was wrong", "old": "previous claim", "new": "corrected fact", "reason": "why"}]',
+                    '5. Use Markdown formatting (tables, bold, headings) in the summary',
+                    '6. Generate extensions (chart/table/timeline/map) as appropriate',
+                    `7. Include "versions": ${JSON.stringify(versions)} in the output JSON to preserve history`,
+                    `8. Keep the same slug "${existingSlug}" in meta`,
+                    '',
+                    '=== EXISTING DATA ===',
+                    existingData,
+                    '=== END EXISTING DATA ===',
+                    '',
+                  ].join('\n');
+                } catch {
+                  // Existing file not found, treat as new research
+                }
+              }
+
               const systemPrompt = [
                 'You are a research assistant.',
                 `Research the following topic thoroughly: "${topic}"`,
                 parentSlugLine,
+                updateBlock,
                 `CRITICAL LANGUAGE INSTRUCTION: ALL content you generate (overview summary, key findings, significance, keyword terms, ochiai summaries, snippets) MUST be written in ${langName}. The JSON field names stay in English, but all human-readable text values must be in ${langName}.`,
                 '',
                 'Follow the skill instructions below to conduct research and write results as JSON files.',

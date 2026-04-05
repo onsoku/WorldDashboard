@@ -57,6 +57,25 @@ export interface ProfileExtension {
 
 export type Extension = MapExtension | TimelineExtension | TableExtension | ChartExtension | ProfileExtension;
 
+export interface ResearchCorrection {
+  target: string;
+  old: string;
+  new: string;
+  reason: string;
+}
+
+export interface ResearchVersion {
+  version: number;
+  createdAt: string;
+  overview?: ResearchOverview;
+  keywords?: KeywordEntry[];
+  webSources?: WebSource[];
+  academicPapers?: AcademicPaper[];
+  statistics?: ResearchStatistics;
+  extensions?: Record<string, Extension>;
+  corrections?: ResearchCorrection[];
+}
+
 export interface ResearchData {
   meta: ResearchMeta;
   overview?: ResearchOverview;
@@ -65,6 +84,7 @@ export interface ResearchData {
   academicPapers?: AcademicPaper[];
   statistics?: ResearchStatistics;
   extensions?: Record<string, Extension>;
+  versions?: ResearchVersion[];
   [key: string]: unknown;
 }
 

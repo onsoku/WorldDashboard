@@ -13,6 +13,8 @@ interface TopicSelectorProps {
   drilldownRequest?: { topic: string; parentSlug: string } | null;
   onDrilldownConsumed?: () => void;
   onImport?: (file: File) => void;
+  updateRequest?: { topic: string; slug: string } | null;
+  onUpdateConsumed?: () => void;
 }
 
 interface ActiveJob {
@@ -21,7 +23,7 @@ interface ActiveJob {
   startedAt: string;
 }
 
-export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport }: TopicSelectorProps) {
+export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport, updateRequest, onUpdateConsumed }: TopicSelectorProps) {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const [filter, setFilter] = useState('');
@@ -43,13 +45,19 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
 
   const handleError = useCallback((_message: string) => { }, []);
 
-  const startResearch = useCallback(async (topic: string, parentSlug?: string) => {
+  const startResearch = useCallback(async (topic: string, opts?: { parentSlug?: string; mode?: string; slug?: string }) => {
     if (!topic.trim() || activeJob) return;
     try {
       const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim(), language: settings.language, parentSlug }),
+        body: JSON.stringify({
+          topic: topic.trim(),
+          language: settings.language,
+          parentSlug: opts?.parentSlug,
+          mode: opts?.mode,
+          slug: opts?.slug,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? 'Failed'); return; }
@@ -61,10 +69,17 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
 
   useEffect(() => {
     if (drilldownRequest && !activeJob) {
-      startResearch(drilldownRequest.topic, drilldownRequest.parentSlug);
+      startResearch(drilldownRequest.topic, { parentSlug: drilldownRequest.parentSlug });
       onDrilldownConsumed?.();
     }
   }, [drilldownRequest, activeJob, startResearch, onDrilldownConsumed]);
+
+  useEffect(() => {
+    if (updateRequest && !activeJob) {
+      startResearch(updateRequest.topic, { mode: 'update', slug: updateRequest.slug });
+      onUpdateConsumed?.();
+    }
+  }, [updateRequest, activeJob, startResearch, onUpdateConsumed]);
 
   return (
     <div className="flex flex-col h-full">

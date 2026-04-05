@@ -5,6 +5,7 @@ import { ThemeOverview } from '@/components/ThemeOverview';
 import { KeywordMap } from '@/components/KeywordMap';
 import { SourceList } from '@/components/SourceList';
 import { ExtensionRenderer } from '@/components/ExtensionRenderer';
+import { VersionHistory } from '@/components/VersionHistory';
 import { useResearchData } from '@/hooks/useResearchData';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsProvider } from '@/context/SettingsContext';
@@ -15,6 +16,7 @@ function Dashboard() {
   const { topics, selectedSlug, currentData, isLoading, error, refreshTopics, selectTopic } = useResearchData();
   const { t } = useTranslation();
   const [drilldownRequest, setDrilldownRequest] = useState<{ topic: string; parentSlug: string } | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
   const handleDrilldown = useCallback((topic: string) => {
     const existing = topics.find(tp =>
@@ -55,6 +57,13 @@ function Dashboard() {
     } catch { alert('Invalid JSON file'); }
   }, [refreshTopics, selectTopic]);
 
+  const [updateRequest, setUpdateRequest] = useState<{ topic: string; slug: string } | null>(null);
+
+  const handleUpdate = useCallback(() => {
+    if (!currentData) return;
+    setUpdateRequest({ topic: currentData.meta.topic, slug: currentData.meta.slug });
+  }, [currentData]);
+
   const sidebar = (
     <TopicSelector
       topics={topics}
@@ -64,11 +73,25 @@ function Dashboard() {
       drilldownRequest={drilldownRequest}
       onDrilldownConsumed={() => setDrilldownRequest(null)}
       onImport={handleImport}
+      updateRequest={updateRequest}
+      onUpdateConsumed={() => setUpdateRequest(null)}
     />
   );
 
+  // Determine which version's data to display
+  const versionData = selectedVersion !== null && currentData?.versions
+    ? currentData.versions.find(v => v.version === selectedVersion)
+    : null;
+  const displayOverview = versionData?.overview ?? currentData?.overview;
+  const displayKeywords = versionData?.keywords ?? currentData?.keywords;
+  const displayWebSources = versionData?.webSources ?? currentData?.webSources;
+  const displayPapers = versionData?.academicPapers ?? currentData?.academicPapers;
+  const displayStats = versionData?.statistics ?? currentData?.statistics;
+  const displayExtensions = versionData?.extensions ?? currentData?.extensions;
+  const currentVersionNum = (currentData?.versions?.length ?? 0) + 1;
+
   return (
-    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined}>
+    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined} onUpdate={currentData ? handleUpdate : undefined}>
       {isLoading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
@@ -90,27 +113,35 @@ function Dashboard() {
 
       {!isLoading && !error && currentData && (
         <div className="space-y-6">
-          {currentData.statistics && (
-            <StatsBar
-              statistics={currentData.statistics}
-              keywordCount={currentData.keywords?.length ?? 0}
+          {currentData.versions && currentData.versions.length > 0 && (
+            <VersionHistory
+              versions={currentData.versions}
+              currentVersion={currentVersionNum}
+              selectedVersion={selectedVersion}
+              onSelectVersion={setSelectedVersion}
             />
           )}
-          {currentData.overview && (
-            <ThemeOverview overview={currentData.overview} onDrilldown={handleDrilldown} />
+          {displayStats && (
+            <StatsBar
+              statistics={displayStats}
+              keywordCount={displayKeywords?.length ?? 0}
+            />
           )}
-          {currentData.keywords && currentData.keywords.length > 0 && (
-            <KeywordMap keywords={currentData.keywords} onDrilldown={handleDrilldown} />
+          {displayOverview && (
+            <ThemeOverview overview={displayOverview} onDrilldown={selectedVersion === null ? handleDrilldown : undefined} />
           )}
-          {currentData.extensions && Object.keys(currentData.extensions).length > 0 && (
-            <ExtensionRenderer extensions={currentData.extensions} />
+          {displayKeywords && displayKeywords.length > 0 && (
+            <KeywordMap keywords={displayKeywords} onDrilldown={selectedVersion === null ? handleDrilldown : undefined} />
           )}
-          {((currentData.webSources && currentData.webSources.length > 0) ||
-            (currentData.academicPapers && currentData.academicPapers.length > 0)) && (
+          {displayExtensions && Object.keys(displayExtensions).length > 0 && (
+            <ExtensionRenderer extensions={displayExtensions} />
+          )}
+          {((displayWebSources && displayWebSources.length > 0) ||
+            (displayPapers && displayPapers.length > 0)) && (
             <SourceList
-              webSources={currentData.webSources ?? []}
-              academicPapers={currentData.academicPapers ?? []}
-              onDrilldown={handleDrilldown}
+              webSources={displayWebSources ?? []}
+              academicPapers={displayPapers ?? []}
+              onDrilldown={selectedVersion === null ? handleDrilldown : undefined}
             />
           )}
         </div>
