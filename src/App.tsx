@@ -6,15 +6,17 @@ import { KeywordMap } from '@/components/KeywordMap';
 import { SourceList } from '@/components/SourceList';
 import { ExtensionRenderer } from '@/components/ExtensionRenderer';
 import { VersionHistory } from '@/components/VersionHistory';
+import { TranslateDialog } from '@/components/TranslateDialog';
 import { useResearchData } from '@/hooks/useResearchData';
 import { useTranslation } from '@/i18n/useTranslation';
-import { SettingsProvider } from '@/context/SettingsContext';
+import { SettingsProvider, useSettings } from '@/context/SettingsContext';
 import { Loader2 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 
 function Dashboard() {
   const { topics, selectedSlug, currentData, isLoading, error, refreshTopics, selectTopic } = useResearchData();
   const { t } = useTranslation();
+  const { settings } = useSettings();
   const [drilldownRequest, setDrilldownRequest] = useState<{ topic: string; parentSlug: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
 
@@ -58,10 +60,17 @@ function Dashboard() {
   }, [refreshTopics, selectTopic]);
 
   const [updateRequest, setUpdateRequest] = useState<{ topic: string; slug: string } | null>(null);
+  const [translateRequest, setTranslateRequest] = useState<{ sourceSlug: string; targetLang: string } | null>(null);
+  const [showTranslateDialog, setShowTranslateDialog] = useState(false);
 
   const handleUpdate = useCallback(() => {
     if (!currentData) return;
     setUpdateRequest({ topic: currentData.meta.topic, slug: currentData.meta.slug });
+  }, [currentData]);
+
+  const handleTranslate = useCallback((targetLang: string) => {
+    if (!currentData) return;
+    setTranslateRequest({ sourceSlug: currentData.meta.slug, targetLang });
   }, [currentData]);
 
   const sidebar = (
@@ -75,6 +84,8 @@ function Dashboard() {
       onImport={handleImport}
       updateRequest={updateRequest}
       onUpdateConsumed={() => setUpdateRequest(null)}
+      translateRequest={translateRequest}
+      onTranslateConsumed={() => setTranslateRequest(null)}
     />
   );
 
@@ -91,7 +102,7 @@ function Dashboard() {
   const currentVersionNum = (currentData?.versions?.length ?? 0) + 1;
 
   return (
-    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined} onUpdate={currentData ? handleUpdate : undefined}>
+    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined} onUpdate={currentData ? handleUpdate : undefined} onTranslate={currentData ? () => setShowTranslateDialog(true) : undefined}>
       {isLoading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
@@ -145,6 +156,13 @@ function Dashboard() {
             />
           )}
         </div>
+      )}
+      {showTranslateDialog && currentData && (
+        <TranslateDialog
+          currentLang={settings.language}
+          onTranslate={handleTranslate}
+          onClose={() => setShowTranslateDialog(false)}
+        />
       )}
     </Layout>
   );

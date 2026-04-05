@@ -246,6 +246,188 @@ export function researchApiPlugin(): Plugin {
         });
       });
 
+      // Translate API endpoint
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? '';
+        if (url !== '/api/translate' || req.method !== 'POST') return next();
+
+        res.setHeader('Content-Type', 'application/json');
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const { sourceSlug, targetLang } = JSON.parse(body);
+            if (!sourceSlug || !targetLang) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'sourceSlug and targetLang are required' }));
+              return;
+            }
+
+            // Check for running jobs
+            for (const [, job] of jobs) {
+              if (job.status === 'running') {
+                res.statusCode = 409;
+                res.end(JSON.stringify({ error: '別の調査が実行中です', runningTopic: job.topic }));
+                return;
+              }
+            }
+
+            const projectRoot = process.cwd();
+            const dataDir = path.join(projectRoot, 'public', 'data');
+
+            let sourceData: string;
+            let sourceTopic: string;
+            try {
+              sourceData = readFileSync(path.join(dataDir, `${sourceSlug}.json`), 'utf-8');
+              sourceTopic = JSON.parse(sourceData).meta?.topic ?? sourceSlug;
+            } catch {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: `Source topic "${sourceSlug}" not found` }));
+              return;
+            }
+
+            const newSlug = `${sourceSlug}-${targetLang}`;
+            const jobId = toSlug('translate') + '-' + Date.now();
+
+            const LANG_NAMES: Record<string, string> = {
+              ja: 'Japanese', en: 'English', zh: 'Chinese (Simplified)',
+              es: 'Spanish', it: 'Italian', fr: 'French',
+            };
+            const targetLangName = LANG_NAMES[targetLang] ?? targetLang;
+
+            const job: ResearchJob = {
+              topic: `${sourceTopic} → ${targetLangName}`,
+              status: 'running',
+              startedAt: new Date().toISOString(),
+              logs: [],
+              lang: targetLang,
+            };
+            jobs.set(jobId, job);
+            addLog(job, 'start', `${msg(targetLang, 'start')}: ${sourceTopic} → ${targetLangName}`);
+
+            const tmpDir = path.join(projectRoot, '.claude', 'tmp');
+            mkdirSync(tmpDir, { recursive: true });
+            const promptFile = path.join(tmpDir, `prompt-${jobId}.txt`);
+
+            let skillInstructions = '';
+            try {
+              skillInstructions = readFileSync(
+                path.join(projectRoot, '.claude', 'skills', 'research', 'SKILL.md'),
+                'utf-8'
+              );
+            } catch { /* Skill file not found */ }
+
+            const systemPrompt = [
+              'You are a translation assistant with cultural awareness.',
+              '',
+              '=== TRANSLATION MODE ===',
+              `Translate the following research topic from its original language to ${targetLangName}.`,
+              `Output slug: "${newSlug}"`,
+              `Include "sourceSlug": "${sourceSlug}" and "sourceLang": "${targetLang}" in the meta object.`,
+              '',
+              'CRITICAL: This is NOT a simple word-for-word translation. Follow these phases:',
+              '',
+              'Phase 0: Cultural Difference Assessment',
+              '- Read the source data below',
+              '- For each section, determine if:',
+              '  (A) Direct translation is sufficient',
+              '  (B) Cultural annotation is needed (e.g., explaining unfamiliar concepts)',
+              '  (C) Additional research is required (e.g., "Napolitan spaghetti" translated to Italian needs context that this is a Japanese dish, not Neapolitan)',
+              '- Log your assessment before proceeding',
+              '',
+              'Phase 1: Translation',
+              '- Translate overview (summary, keyFindings, significance) to ' + targetLangName,
+              '- Translate keywords terms to ' + targetLangName,
+              '- Translate ochiaiSummary fields to ' + targetLangName,
+              '- Translate extension content (table headers/rows, timeline titles/descriptions) to ' + targetLangName,
+              '- Keep paper titles, author names, URLs, and paperId as-is (do NOT translate)',
+              '- Keep all numeric data (citationCount, relevance scores, chart data) as-is',
+              '- Use Markdown formatting in summary (tables, bold, headings)',
+              '',
+              'Phase 2: Supplementary Research (only if Phase 0 identified pattern C)',
+              '- Use WebSearch to find how this topic is perceived in the target language/culture',
+              '- Add cultural context notes to the summary',
+              '- If the topic has a different name or connotation in the target culture, explain this',
+              '',
+              `ALL output text must be in ${targetLangName}.`,
+              '',
+              '=== SOURCE DATA ===',
+              sourceData,
+              '=== END SOURCE DATA ===',
+              '',
+              'Follow the skill instructions below for JSON output format:',
+              '',
+              skillInstructions,
+              '',
+              `IMPORTANT: Write output files to ${dataDir.replace(/\\/g, '/')}`,
+              `Output slug must be "${newSlug}"`,
+            ].join('\n');
+
+            writeFileSync(promptFile, systemPrompt, 'utf-8');
+
+            const child = spawn('claude', [
+              '-p', 'Execute the translation task described in the system prompt.',
+              '--system-prompt-file', promptFile,
+              '--allowedTools', 'WebSearch,WebFetch,Read,Write',
+              '--max-turns', '20',
+              '--output-format', 'stream-json',
+              '--verbose',
+            ], {
+              cwd: projectRoot,
+              shell: true,
+              stdio: ['ignore', 'pipe', 'pipe'],
+              env: {
+                ...process.env,
+                HOME: process.env.HOME ?? process.env.USERPROFILE ?? '',
+                USERPROFILE: process.env.USERPROFILE ?? '',
+                APPDATA: process.env.APPDATA ?? '',
+                LOCALAPPDATA: process.env.LOCALAPPDATA ?? '',
+              },
+            });
+
+            let stdoutBuffer = '';
+            child.stdout?.on('data', (data: Buffer) => {
+              stdoutBuffer += data.toString();
+              const lines = stdoutBuffer.split('\n');
+              stdoutBuffer = lines.pop() ?? '';
+              for (const line of lines) {
+                if (line.trim()) parseStreamLine(line.trim(), job);
+              }
+            });
+
+            let stderrBuffer = '';
+            child.stderr?.on('data', (data: Buffer) => { stderrBuffer += data.toString(); });
+
+            child.on('close', (code) => {
+              if (stdoutBuffer.trim()) parseStreamLine(stdoutBuffer.trim(), job);
+              if (job.status === 'running') {
+                if (code === 0) {
+                  job.status = 'completed';
+                  job.message = `Translation complete: ${sourceTopic} → ${targetLangName}`;
+                  addLog(job, 'done', job.message);
+                } else {
+                  job.status = 'error';
+                  job.message = stderrBuffer.trim().slice(0, 300) || `Process exited with code ${code}`;
+                  addLog(job, 'error', job.message);
+                }
+              }
+            });
+
+            child.on('error', (err) => {
+              job.status = 'error';
+              job.message = `Claude CLI failed: ${err.message}`;
+              addLog(job, 'error', job.message);
+            });
+
+            res.statusCode = 202;
+            res.end(JSON.stringify({ jobId, topic: job.topic, slug: newSlug, status: 'running' }));
+          } catch {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          }
+        });
+      });
+
       // Research API endpoint
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? '';

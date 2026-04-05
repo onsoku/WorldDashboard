@@ -4,6 +4,8 @@ export interface ResearchMeta {
   createdAt?: string;
   queryTerms?: string[];
   parentSlug?: string;
+  sourceSlug?: string;
+  sourceLang?: string;
 }
 
 export interface ResearchOverview {

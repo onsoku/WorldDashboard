@@ -15,6 +15,8 @@ interface TopicSelectorProps {
   onImport?: (file: File) => void;
   updateRequest?: { topic: string; slug: string } | null;
   onUpdateConsumed?: () => void;
+  translateRequest?: { sourceSlug: string; targetLang: string } | null;
+  onTranslateConsumed?: () => void;
 }
 
 interface ActiveJob {
@@ -23,7 +25,7 @@ interface ActiveJob {
   startedAt: string;
 }
 
-export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport, updateRequest, onUpdateConsumed }: TopicSelectorProps) {
+export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport, updateRequest, onUpdateConsumed, translateRequest, onTranslateConsumed }: TopicSelectorProps) {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const [filter, setFilter] = useState('');
@@ -80,6 +82,27 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
       onUpdateConsumed?.();
     }
   }, [updateRequest, activeJob, startResearch, onUpdateConsumed]);
+
+  const startTranslate = useCallback(async (sourceSlug: string, targetLang: string) => {
+    if (activeJob) return;
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceSlug, targetLang }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error ?? 'Failed'); return; }
+      setActiveJob({ jobId: data.jobId, topic: data.topic, startedAt: new Date().toISOString() });
+    } catch { alert('Connection failed'); }
+  }, [activeJob]);
+
+  useEffect(() => {
+    if (translateRequest && !activeJob) {
+      startTranslate(translateRequest.sourceSlug, translateRequest.targetLang);
+      onTranslateConsumed?.();
+    }
+  }, [translateRequest, activeJob, startTranslate, onTranslateConsumed]);
 
   return (
     <div className="flex flex-col h-full">

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BookOpen, Download, RefreshCw } from 'lucide-react';
+import { BookOpen, Download, RefreshCw, Languages } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsPanel } from './SettingsPanel';
 
@@ -9,9 +9,10 @@ interface LayoutProps {
   topicName?: string;
   onExport?: () => void;
   onUpdate?: () => void;
+  onTranslate?: () => void;
 }
 
-export function Layout({ sidebar, children, topicName, onExport, onUpdate }: LayoutProps) {
+export function Layout({ sidebar, children, topicName, onExport, onUpdate, onTranslate }: LayoutProps) {
   const { t } = useTranslation();
 
   return (
@@ -33,6 +34,12 @@ export function Layout({ sidebar, children, topicName, onExport, onUpdate }: Lay
           <header className="sticky top-0 z-10 theme-bg-header backdrop-blur border-b theme-border px-6 py-3 flex items-center justify-between">
             <h2 className="text-xl font-semibold theme-text">{topicName}</h2>
             <div className="flex items-center gap-2">
+              {onTranslate && (
+                <button onClick={onTranslate} title={t('translate.button')}
+                  className="p-1.5 rounded-md theme-text-secondary hover:theme-bg-hover transition-colors">
+                  <Languages className="w-4 h-4" />
+                </button>
+              )}
               {onUpdate && (
                 <button onClick={onUpdate} title={t('update.button')}
                   className="p-1.5 rounded-md theme-text-secondary hover:theme-bg-hover transition-colors">

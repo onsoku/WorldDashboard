@@ -69,6 +69,10 @@ const translations: Record<Language, Record<string, string>> = {
     'version.latest': '最新',
     'version.total': '全バージョン',
     'version.corrections': '訂正事項',
+    'translate.button': '翻訳',
+    'translate.title': '他の言語に翻訳',
+    'translate.selectLang': '翻訳先の言語を選択...',
+    'translate.start': '翻訳を開始',
   },
   en: {
     'app.title': 'World Dashboard',
@@ -138,6 +142,10 @@ const translations: Record<Language, Record<string, string>> = {
     'version.latest': 'Latest',
     'version.total': 'Total versions',
     'version.corrections': 'Corrections',
+    'translate.button': 'Translate',
+    'translate.title': 'Translate to another language',
+    'translate.selectLang': 'Select target language...',
+    'translate.start': 'Start Translation',
   },
   zh: {
     'app.title': 'World Dashboard',
@@ -207,6 +215,10 @@ const translations: Record<Language, Record<string, string>> = {
     'version.latest': '最新',
     'version.total': '总版本',
     'version.corrections': '更正',
+    'translate.button': '翻译',
+    'translate.title': '翻译为其他语言',
+    'translate.selectLang': '选择目标语言...',
+    'translate.start': '开始翻译',
   },
   es: {
     'app.title': 'World Dashboard',
@@ -276,6 +288,10 @@ const translations: Record<Language, Record<string, string>> = {
     'version.latest': 'Ultima',
     'version.total': 'Versiones totales',
     'version.corrections': 'Correcciones',
+    'translate.button': 'Traducir',
+    'translate.title': 'Traducir a otro idioma',
+    'translate.selectLang': 'Seleccionar idioma...',
+    'translate.start': 'Iniciar traduccion',
   },
   it: {
     'app.title': 'World Dashboard',
@@ -345,6 +361,10 @@ const translations: Record<Language, Record<string, string>> = {
     'version.latest': 'Ultima',
     'version.total': 'Versioni totali',
     'version.corrections': 'Correzioni',
+    'translate.button': 'Traduci',
+    'translate.title': 'Traduci in un\'altra lingua',
+    'translate.selectLang': 'Seleziona lingua...',
+    'translate.start': 'Avvia traduzione',
   },
   fr: {
     'app.title': 'World Dashboard',
@@ -414,6 +434,10 @@ const translations: Record<Language, Record<string, string>> = {
     'version.latest': 'Derniere',
     'version.total': 'Versions totales',
     'version.corrections': 'Corrections',
+    'translate.button': 'Traduire',
+    'translate.title': 'Traduire dans une autre langue',
+    'translate.selectLang': 'Choisir la langue...',
+    'translate.start': 'Commencer la traduction',
   },
 };
 
