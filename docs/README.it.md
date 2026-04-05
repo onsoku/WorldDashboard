@@ -18,6 +18,9 @@
 - **Importa/Esporta** — Pulsante esporta (↓) nell'intestazione scarica l'argomento corrente come JSON; pulsante importa (↑) nella barra laterale o trascina e rilascia file JSON
 - **Schema Flessibile** — Solo `meta.topic` e `meta.slug` sono obbligatori; tutti gli altri campi sono opzionali. Sistema di estensioni per dati tematici (mappa, timeline, tabella, grafico, profilo)
 - **Visualizzazione Avanzata** — Rendering Markdown (tabelle, grassetto, intestazioni, elenchi) nella panoramica e nei riassunti degli articoli. Renderer di estensioni per tabella, grafico (barre/linee/torta tramite Recharts) e timeline
+- **Aggiornamenti con Gestione Versioni** — Aggiorna argomenti esistenti con nuove informazioni preservando la cronologia delle versioni. Le versioni precedenti restano intatte e consultabili. Le correzioni vengono tracciate quando i fatti cambiano
+- **Traduzione Culturalmente Consapevole** — Traduci argomenti in una qualsiasi delle 6 lingue supportate con valutazione automatica delle differenze culturali. Va oltre la traduzione letterale con ricerca web supplementare quando il contesto culturale differisce
+- **Grafici e Mappe Estesi** — 7 tipi di grafici (barre, linee, torta, area, radar, dispersione, barre impilate) con supporto multi-serie. Mappe interattive tramite Leaflet/OpenStreetMap con marcatori e popup
 
 ## Stack Tecnologico
 
@@ -27,6 +30,7 @@
 | Stili | Tailwind CSS 4 |
 | Markdown | react-markdown + remark-gfm |
 | Grafici | Recharts |
+| Mappe | Leaflet + react-leaflet |
 | Icone | Lucide React |
 | Agente IA | Claude Code CLI |
 | Articoli | Semantic Scholar API (gratuito) |
@@ -59,7 +63,9 @@ Apri http://localhost:5173 nel browser
 5. Passa tra gli argomenti precedenti nella barra laterale
 6. **Drilldown** — Clicca su qualsiasi parola chiave o suggerimento per ricercare un argomento correlato
 7. **Esporta** — Clicca ↓ nell'intestazione per scaricare JSON; **Importa** — Clicca ↑ nella barra laterale o trascina e rilascia file JSON
-8. Cambia tema/lingua con l'icona ⚙️
+8. **Aggiorna** — Clicca il pulsante di aggiornamento (↻) per aggiornare un argomento con le informazioni piu recenti
+9. **Traduci** — Clicca il pulsante di traduzione per convertire un argomento in un'altra lingua
+10. Cambia tema/lingua con l'icona ⚙️
 
 ## Licenza
 

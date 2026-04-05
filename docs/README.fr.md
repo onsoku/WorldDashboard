@@ -18,6 +18,9 @@
 - **Import/Export** — Bouton exporter (↓) dans l'en-tete telecharge le sujet courant en JSON ; bouton importer (↑) dans la barre laterale ou glissez-deposez des fichiers JSON
 - **Schema Flexible** — Seuls `meta.topic` et `meta.slug` sont obligatoires ; tous les autres champs sont optionnels. Systeme d'extensions pour les donnees thematiques (carte, chronologie, tableau, graphique, profil)
 - **Affichage Enrichi** — Rendu Markdown (tableaux, gras, titres, listes) dans l'apercu et les resumes d'articles. Renderers d'extensions pour tableau, graphique (barres/lignes/camembert via Recharts) et chronologie
+- **Mises a jour avec Gestion de Versions** — Mettez a jour les sujets existants avec de nouvelles informations tout en preservant l'historique des versions. Les versions precedentes restent intactes et consultables. Les corrections sont suivies lorsque les faits changent
+- **Traduction Culturellement Consciente** — Traduisez les sujets dans n'importe laquelle des 6 langues supportees avec evaluation automatique des differences culturelles. Va au-dela de la traduction litterale avec recherche web complementaire lorsque le contexte culturel differe
+- **Graphiques et Cartes Etendus** — 7 types de graphiques (barres, lignes, camembert, aire, radar, dispersion, barres empilees) avec support multi-series. Cartes interactives via Leaflet/OpenStreetMap avec marqueurs et popups
 
 ## Stack Technique
 
@@ -27,6 +30,7 @@
 | Styles | Tailwind CSS 4 |
 | Markdown | react-markdown + remark-gfm |
 | Graphiques | Recharts |
+| Cartes | Leaflet + react-leaflet |
 | Icones | Lucide React |
 | Agent IA | Claude Code CLI |
 | Articles | Semantic Scholar API (gratuit) |
@@ -59,7 +63,9 @@ Ouvrez http://localhost:5173 dans votre navigateur
 5. Basculez entre les sujets precedents dans la barre laterale
 6. **Drilldown** — Cliquez sur un mot-cle ou une suggestion pour rechercher un sujet connexe
 7. **Exporter** — Cliquez sur ↓ dans l'en-tete pour telecharger le JSON ; **Importer** — Cliquez sur ↑ dans la barre laterale ou glissez-deposez des fichiers JSON
-8. Changez le theme/langue via l'icone ⚙️
+8. **Mettre a jour** — Cliquez sur le bouton de mise a jour (↻) pour actualiser un sujet avec les dernieres informations
+9. **Traduire** — Cliquez sur le bouton de traduction pour convertir un sujet dans une autre langue
+10. Changez le theme/langue via l'icone ⚙️
 
 ## Licence
 

@@ -35,6 +35,9 @@
 - **Import/Export** — Export button (↓) in header downloads current topic as JSON; import button (↑) in sidebar or drag & drop JSON files onto the topic list
 - **Flexible Schema** — Only `meta.topic` and `meta.slug` are required; all other fields optional. Extensions system for theme-specific data (map, timeline, table, chart, profile)
 - **Rich Display** — Markdown rendering (tables, bold, headings, lists) in overview and paper summaries. Extension renderers for table, chart (bar/line/pie via Recharts), and timeline
+- **Version-managed Updates** — Update existing topics with new information while preserving version history. Previous versions are kept intact and browsable. Corrections are tracked when facts change
+- **Culture-aware Translation** — Translate topics to any of 6 supported languages with automatic cultural difference assessment. Goes beyond word-for-word translation with supplementary web search when cultural context differs
+- **Extended Charts & Maps** — 7 chart types (bar, line, pie, area, radar, scatter, stacked bar) with multi-series support. Interactive maps via Leaflet/OpenStreetMap with markers and popups
 
 ## Tech Stack
 
@@ -44,6 +47,7 @@
 | Styling | Tailwind CSS 4 |
 | Markdown | react-markdown + remark-gfm |
 | Charts | Recharts |
+| Maps | Leaflet + react-leaflet |
 | Icons | Lucide React |
 | AI Agent | Claude Code CLI |
 | Papers | Semantic Scholar API (free) |
@@ -76,7 +80,9 @@ Open http://localhost:5173
 5. Switch between past topics in the sidebar
 6. **Drilldown** — Click any keyword or suggestion to research a related topic
 7. **Export** — Click ↓ in the header to download a topic as JSON; **Import** — Click ↑ in the sidebar or drag & drop JSON files
-8. Change theme/language via the ⚙️ icon
+8. **Update** — Click the update button (↻) to refresh a topic with the latest information
+9. **Translate** — Click the translate button to convert a topic to another language
+10. Change theme/language via the ⚙️ icon
 
 ## Project Structure
 

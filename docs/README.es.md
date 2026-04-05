@@ -18,6 +18,9 @@
 - **Importar/Exportar** — Boton de exportar (↓) en el encabezado descarga el tema actual como JSON; boton de importar (↑) en la barra lateral o arrastra y suelta archivos JSON
 - **Esquema Flexible** — Solo `meta.topic` y `meta.slug` son obligatorios; todos los demas campos son opcionales. Sistema de extensiones para datos tematicos (mapa, linea de tiempo, tabla, grafico, perfil)
 - **Visualizacion Enriquecida** — Renderizado Markdown (tablas, negrita, encabezados, listas) en la vista general y resumenes de articulos. Renderizadores de extensiones para tabla, grafico (barras/lineas/circular via Recharts) y linea de tiempo
+- **Actualizaciones con Control de Versiones** — Actualiza temas existentes con nueva informacion preservando el historial de versiones. Las versiones anteriores se mantienen intactas y navegables. Se rastrean las correcciones cuando los hechos cambian
+- **Traduccion con Conciencia Cultural** — Traduce temas a cualquiera de los 6 idiomas soportados con evaluacion automatica de diferencias culturales. Va mas alla de la traduccion literal con busqueda web complementaria cuando el contexto cultural difiere
+- **Graficos y Mapas Extendidos** — 7 tipos de graficos (barras, lineas, circular, area, radar, dispersion, barras apiladas) con soporte multi-serie. Mapas interactivos via Leaflet/OpenStreetMap con marcadores y ventanas emergentes
 
 ## Stack Tecnologico
 
@@ -27,6 +30,7 @@
 | Estilos | Tailwind CSS 4 |
 | Markdown | react-markdown + remark-gfm |
 | Graficos | Recharts |
+| Mapas | Leaflet + react-leaflet |
 | Iconos | Lucide React |
 | Agente IA | Claude Code CLI |
 | Articulos | Semantic Scholar API (gratuito) |
@@ -59,7 +63,9 @@ Abre http://localhost:5173 en tu navegador
 5. Cambia entre temas anteriores en la barra lateral
 6. **Drilldown** — Haz clic en cualquier palabra clave o sugerencia para investigar un tema relacionado
 7. **Exportar** — Clic en ↓ en el encabezado para descargar JSON; **Importar** — Clic en ↑ en la barra lateral o arrastra y suelta archivos JSON
-8. Cambia tema/idioma con el icono ⚙️
+8. **Actualizar** — Clic en el boton de actualizar (↻) para refrescar un tema con la informacion mas reciente
+9. **Traducir** — Clic en el boton de traducir para convertir un tema a otro idioma
+10. Cambia tema/idioma con el icono ⚙️
 
 ## Licencia
 
