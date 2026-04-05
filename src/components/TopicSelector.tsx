@@ -1,5 +1,5 @@
-import { RefreshCw, Search, Plus } from 'lucide-react';
-import { useState, useCallback, useEffect } from 'react';
+import { RefreshCw, Search, Plus, Upload } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { TopicEntry } from '@/types/research';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useSettings } from '@/context/SettingsContext';
@@ -12,6 +12,7 @@ interface TopicSelectorProps {
   onRefresh: () => void;
   drilldownRequest?: { topic: string; parentSlug: string } | null;
   onDrilldownConsumed?: () => void;
+  onImport?: (file: File) => void;
 }
 
 interface ActiveJob {
@@ -20,13 +21,15 @@ interface ActiveJob {
   startedAt: string;
 }
 
-export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed }: TopicSelectorProps) {
+export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport }: TopicSelectorProps) {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const [filter, setFilter] = useState('');
   const [newTopic, setNewTopic] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = topics.filter(tp =>
     tp.topic.toLowerCase().includes(filter.toLowerCase())
@@ -74,6 +77,16 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
             className={`flex items-center justify-center gap-1 px-3 py-1.5 text-sm rounded-md transition-colors disabled:opacity-40 ${showNewForm ? 'theme-primary text-white' : 'theme-primary-light theme-primary-text hover:theme-bg-active'}`}>
             <Plus className="w-3.5 h-3.5" /> {t('sidebar.new')}
           </button>
+          {onImport && (
+            <>
+              <input ref={fileInputRef} type="file" accept=".json" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
+              <button onClick={() => fileInputRef.current?.click()} title={t('import.button')}
+                className="flex items-center justify-center p-1.5 text-sm rounded-md transition-colors theme-primary-light theme-primary-text hover:theme-bg-active">
+                <Upload className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
         </div>
 
         {showNewForm && !activeJob && (
@@ -101,7 +114,16 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
             className="w-full pl-8 pr-3 py-1.5 text-sm border theme-border rounded-md theme-bg-input theme-text focus:outline-none focus:ring-2 theme-ring" />
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto"
+        onDragOver={e => { if (onImport) { e.preventDefault(); setIsDragOver(true); } }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={e => {
+          e.preventDefault();
+          setIsDragOver(false);
+          const f = e.dataTransfer.files[0];
+          if (f && f.name.endsWith('.json') && onImport) onImport(f);
+        }}
+        style={isDragOver ? { outline: '2px dashed var(--color-primary)', outlineOffset: '-2px' } : undefined}>
         {filtered.length === 0 ? (
           <p className="px-4 py-8 text-sm theme-text-muted text-center whitespace-pre-line">
             {topics.length === 0 ? t('sidebar.noTopics') : t('sidebar.noMatch')}

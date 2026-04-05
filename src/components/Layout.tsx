@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Download } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsPanel } from './SettingsPanel';
 
@@ -7,9 +7,10 @@ interface LayoutProps {
   sidebar: ReactNode;
   children: ReactNode;
   topicName?: string;
+  onExport?: () => void;
 }
 
-export function Layout({ sidebar, children, topicName }: LayoutProps) {
+export function Layout({ sidebar, children, topicName, onExport }: LayoutProps) {
   const { t } = useTranslation();
 
   return (
@@ -30,7 +31,15 @@ export function Layout({ sidebar, children, topicName }: LayoutProps) {
         {topicName && (
           <header className="sticky top-0 z-10 theme-bg-header backdrop-blur border-b theme-border px-6 py-3 flex items-center justify-between">
             <h2 className="text-xl font-semibold theme-text">{topicName}</h2>
-            <SettingsPanel />
+            <div className="flex items-center gap-2">
+              {onExport && (
+                <button onClick={onExport} title={t('export.button')}
+                  className="p-1.5 rounded-md theme-text-secondary hover:theme-bg-hover transition-colors">
+                  <Download className="w-4 h-4" />
+                </button>
+              )}
+              <SettingsPanel />
+            </div>
           </header>
         )}
         {!topicName && (

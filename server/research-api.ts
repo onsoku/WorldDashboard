@@ -197,6 +197,56 @@ export function researchApiPlugin(): Plugin {
   return {
     name: 'research-api',
     configureServer(server) {
+      // Import API endpoint
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? '';
+        if (url !== '/api/import' || req.method !== 'POST') return next();
+
+        res.setHeader('Content-Type', 'application/json');
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const data = JSON.parse(body);
+            if (!data?.meta?.topic || !data?.meta?.slug) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Invalid data: meta.topic and meta.slug are required' }));
+              return;
+            }
+
+            const slug: string = data.meta.slug;
+            const topic: string = data.meta.topic;
+            const projectRoot = process.cwd();
+            const dataDir = path.join(projectRoot, 'public', 'data');
+
+            // Write topic data
+            writeFileSync(path.join(dataDir, `${slug}.json`), JSON.stringify(data, null, 2), 'utf-8');
+
+            // Update index.json
+            let index: { topics: { slug: string; topic: string; createdAt: string }[] } = { topics: [] };
+            try {
+              index = JSON.parse(readFileSync(path.join(dataDir, 'index.json'), 'utf-8'));
+            } catch { /* file doesn't exist yet */ }
+
+            const existing = index.topics.findIndex(t => t.slug === slug);
+            const entry = { slug, topic, createdAt: data.meta.createdAt ?? new Date().toISOString() };
+            if (existing >= 0) {
+              index.topics[existing] = entry;
+            } else {
+              index.topics.push(entry);
+            }
+            writeFileSync(path.join(dataDir, 'index.json'), JSON.stringify(index, null, 2), 'utf-8');
+
+            res.statusCode = 200;
+            res.end(JSON.stringify({ slug, topic, status: 'imported' }));
+          } catch {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          }
+        });
+      });
+
+      // Research API endpoint
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? '';
         if (!url.startsWith('/api/research')) return next();

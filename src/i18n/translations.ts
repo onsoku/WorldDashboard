@@ -62,6 +62,8 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.description': '「+ 新規」からテーマを入力してください',
     'drilldown.clickToResearch': 'クリックで調査開始',
     'drilldown.researchThis': 'これを調査',
+    'export.button': 'エクスポート',
+    'import.button': 'インポート',
   },
   en: {
     'app.title': 'World Dashboard',
@@ -124,6 +126,8 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.description': 'Click "+ New" to start researching',
     'drilldown.clickToResearch': 'Click to research',
     'drilldown.researchThis': 'Research this',
+    'export.button': 'Export',
+    'import.button': 'Import',
   },
   zh: {
     'app.title': 'World Dashboard',
@@ -186,6 +190,8 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.description': '点击"+ 新建"开始研究',
     'drilldown.clickToResearch': '点击开始研究',
     'drilldown.researchThis': '研究这个',
+    'export.button': '导出',
+    'import.button': '导入',
   },
   es: {
     'app.title': 'World Dashboard',
@@ -248,6 +254,8 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.description': 'Haz clic en "+ Nuevo" para investigar',
     'drilldown.clickToResearch': 'Clic para investigar',
     'drilldown.researchThis': 'Investigar esto',
+    'export.button': 'Exportar',
+    'import.button': 'Importar',
   },
   it: {
     'app.title': 'World Dashboard',
@@ -310,6 +318,8 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.description': 'Clicca "+ Nuovo" per iniziare',
     'drilldown.clickToResearch': 'Clicca per ricercare',
     'drilldown.researchThis': 'Ricerca questo',
+    'export.button': 'Esporta',
+    'import.button': 'Importa',
   },
   fr: {
     'app.title': 'World Dashboard',
@@ -372,6 +382,8 @@ const translations: Record<Language, Record<string, string>> = {
     'empty.description': 'Cliquez sur "+ Nouveau" pour commencer',
     'drilldown.clickToResearch': 'Cliquez pour rechercher',
     'drilldown.researchThis': 'Rechercher ceci',
+    'export.button': 'Exporter',
+    'import.button': 'Importer',
   },
 };
 

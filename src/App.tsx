@@ -26,6 +26,34 @@ function Dashboard() {
     }
   }, [topics, selectTopic, currentData]);
 
+  const handleExport = useCallback(() => {
+    if (!currentData) return;
+    const json = JSON.stringify(currentData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentData.meta.slug}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [currentData]);
+
+  const handleImport = useCallback(async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: text,
+      });
+      const result = await res.json();
+      if (!res.ok) { alert(result.error ?? 'Import failed'); return; }
+      await refreshTopics();
+      selectTopic(data.meta.slug);
+    } catch { alert('Invalid JSON file'); }
+  }, [refreshTopics, selectTopic]);
+
   const sidebar = (
     <TopicSelector
       topics={topics}
@@ -34,11 +62,12 @@ function Dashboard() {
       onRefresh={refreshTopics}
       drilldownRequest={drilldownRequest}
       onDrilldownConsumed={() => setDrilldownRequest(null)}
+      onImport={handleImport}
     />
   );
 
   return (
-    <Layout sidebar={sidebar} topicName={currentData?.meta.topic}>
+    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined}>
       {isLoading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
