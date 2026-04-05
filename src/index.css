@@ -245,3 +245,13 @@
   border-radius: 50%;
   background-color: var(--color-primary);
 }
+
+/* ===== Map Extension ===== */
+
+.map-marker {
+  cursor: pointer;
+  transition: r 0.2s;
+}
+.map-marker:hover {
+  r: 7;
+}

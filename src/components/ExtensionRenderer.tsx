@@ -1,12 +1,32 @@
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  AreaChart, Area,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ScatterChart, Scatter,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
 import { useTranslation } from '@/i18n/useTranslation';
-import type { Extension } from '@/types/research';
+import { MapContainer, TileLayer, Marker as LeafletMarker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import type { Extension, ChartSeries } from '@/types/research';
 
 interface ExtensionRendererProps {
   extensions: Record<string, Extension>;
 }
 
 const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#8b5cf6', '#ec4899', '#14b8a6'];
+
+// Custom marker icon (default Leaflet icons have broken paths in Vite)
+const markerIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
 function TableRenderer({ ext }: { ext: Extract<Extension, { type: 'table' }> }) {
   return (
@@ -38,15 +58,41 @@ function TableRenderer({ ext }: { ext: Extract<Extension, { type: 'table' }> }) 
   );
 }
 
-function ChartRenderer({ ext }: { ext: Extract<Extension, { type: 'chart' }> }) {
-  const data = ext.labels.map((label, i) => ({ name: label, value: ext.data[i] ?? 0 }));
+function isMultiSeries(data: number[] | ChartSeries[]): data is ChartSeries[] {
+  return data.length > 0 && typeof data[0] === 'object' && 'name' in data[0];
+}
 
+function ChartRenderer({ ext }: { ext: Extract<Extension, { type: 'chart' }> }) {
+  const multiSeries = isMultiSeries(ext.data);
+
+  // Build data for single or multi series
+  const chartData = ext.labels.map((label, i) => {
+    const entry: Record<string, string | number> = { name: label };
+    if (multiSeries) {
+      for (const series of ext.data as ChartSeries[]) {
+        entry[series.name] = series.values[i] ?? 0;
+      }
+    } else {
+      entry.value = (ext.data as number[])[i] ?? 0;
+    }
+    return entry;
+  });
+
+  const seriesNames = multiSeries
+    ? (ext.data as ChartSeries[]).map(s => s.name)
+    : ['value'];
+
+  // Pie chart
   if (ext.chartType === 'pie') {
+    const pieData = ext.labels.map((label, i) => ({
+      name: label,
+      value: multiSeries ? (ext.data as ChartSeries[])[0]?.values[i] ?? 0 : (ext.data as number[])[i] ?? 0,
+    }));
     return (
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
-          <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-            {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+          <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+            {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
           </Pie>
           <Tooltip />
           <Legend />
@@ -55,30 +101,124 @@ function ChartRenderer({ ext }: { ext: Extract<Extension, { type: 'chart' }> }) 
     );
   }
 
-  if (ext.chartType === 'line') {
+  // Radar chart
+  if (ext.chartType === 'radar') {
+    return (
+      <ResponsiveContainer width="100%" height={350}>
+        <RadarChart data={chartData}>
+          <PolarGrid stroke="var(--color-border)" />
+          <PolarAngleAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
+          <PolarRadiusAxis tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }} />
+          {seriesNames.map((name, i) => (
+            <Radar key={name} name={name} dataKey={name}
+              stroke={CHART_COLORS[i % CHART_COLORS.length]}
+              fill={CHART_COLORS[i % CHART_COLORS.length]}
+              fillOpacity={0.2} />
+          ))}
+          <Tooltip />
+          {multiSeries && <Legend />}
+        </RadarChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Scatter chart
+  if (ext.chartType === 'scatter') {
+    const scatterData = chartData.map(d => ({ x: d.value ?? d[seriesNames[0]] ?? 0, y: d[seriesNames[1] ?? seriesNames[0]] ?? 0, name: d.name }));
     return (
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data}>
+        <ScatterChart>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <XAxis dataKey="x" name={seriesNames[0]} tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
+          <YAxis dataKey="y" name={seriesNames[1] ?? seriesNames[0]} tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
+          <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+          <Scatter data={scatterData} fill="#6366f1">
+            {scatterData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+          </Scatter>
+        </ScatterChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Area chart
+  if (ext.chartType === 'area') {
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <AreaChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
           <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
           <Tooltip />
-          <Line type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} />
+          {seriesNames.map((name, i) => (
+            <Area key={name} type="monotone" dataKey={name}
+              stroke={CHART_COLORS[i % CHART_COLORS.length]}
+              fill={CHART_COLORS[i % CHART_COLORS.length]}
+              fillOpacity={0.3} />
+          ))}
+          {multiSeries && <Legend />}
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Stacked bar chart
+  if (ext.chartType === 'stackedBar') {
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
+          <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
+          <Tooltip />
+          <Legend />
+          {seriesNames.map((name, i) => (
+            <Bar key={name} dataKey={name} stackId="stack"
+              fill={CHART_COLORS[i % CHART_COLORS.length]} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  }
+
+  // Line chart
+  if (ext.chartType === 'line') {
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
+          <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
+          <Tooltip />
+          {seriesNames.map((name, i) => (
+            <Line key={name} type="monotone" dataKey={name}
+              stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} />
+          ))}
+          {multiSeries && <Legend />}
         </LineChart>
       </ResponsiveContainer>
     );
   }
 
+  // Default: bar chart
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={data}>
+      <BarChart data={chartData}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
         <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
         <YAxis tick={{ fontSize: 12, fill: 'var(--color-text-muted)' }} />
         <Tooltip />
-        <Bar dataKey="value">
-          {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-        </Bar>
+        {multiSeries ? (
+          <>
+            <Legend />
+            {seriesNames.map((name, i) => (
+              <Bar key={name} dataKey={name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </>
+        ) : (
+          <Bar dataKey="value">
+            {chartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+          </Bar>
+        )}
       </BarChart>
     </ResponsiveContainer>
   );
@@ -98,6 +238,31 @@ function TimelineRenderer({ ext }: { ext: Extract<Extension, { type: 'timeline' 
   );
 }
 
+function MapRenderer({ ext }: { ext: Extract<Extension, { type: 'map' }> }) {
+  // Calculate center from locations
+  const avgLat = ext.locations.reduce((s, l) => s + l.lat, 0) / ext.locations.length;
+  const avgLng = ext.locations.reduce((s, l) => s + l.lng, 0) / ext.locations.length;
+
+  return (
+    <div style={{ height: '400px', width: '100%' }}>
+      <MapContainer center={[avgLat, avgLng]} zoom={2} scrollWheelZoom={true}
+        style={{ height: '100%', width: '100%', borderRadius: '0.5rem' }}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        {ext.locations.map((loc, i) => (
+          <LeafletMarker key={i} position={[loc.lat, loc.lng]} icon={markerIcon}>
+            <Popup>
+              <strong>{loc.name}</strong>
+              {loc.description && <p style={{ margin: '4px 0 0' }}>{loc.description}</p>}
+            </Popup>
+          </LeafletMarker>
+        ))}
+      </MapContainer>
+    </div>
+  );
+}
+
 export function ExtensionRenderer({ extensions }: ExtensionRendererProps) {
   const { t } = useTranslation();
 
@@ -109,7 +274,8 @@ export function ExtensionRenderer({ extensions }: ExtensionRendererProps) {
           {ext.type === 'table' && <TableRenderer ext={ext} />}
           {ext.type === 'chart' && <ChartRenderer ext={ext} />}
           {ext.type === 'timeline' && <TimelineRenderer ext={ext} />}
-          {ext.type !== 'table' && ext.type !== 'chart' && ext.type !== 'timeline' && (
+          {ext.type === 'map' && <MapRenderer ext={ext} />}
+          {ext.type !== 'table' && ext.type !== 'chart' && ext.type !== 'timeline' && ext.type !== 'map' && (
             <pre className="text-xs theme-text-secondary overflow-x-auto p-3 rounded-md"
               style={{ backgroundColor: 'var(--color-bg-active)' }}>
               {JSON.stringify(ext, null, 2)}

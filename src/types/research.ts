@@ -35,11 +35,16 @@ export interface TableExtension {
   rows: string[][];
 }
 
+export interface ChartSeries {
+  name: string;
+  values: number[];
+}
+
 export interface ChartExtension {
   type: 'chart';
-  chartType: 'bar' | 'line' | 'pie';
+  chartType: 'bar' | 'line' | 'pie' | 'area' | 'radar' | 'scatter' | 'stackedBar';
   labels: string[];
-  data: number[];
+  data: number[] | ChartSeries[];
 }
 
 export interface ProfileExtension {
