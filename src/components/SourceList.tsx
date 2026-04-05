@@ -8,12 +8,13 @@ import { PaperCard } from './PaperCard';
 interface SourceListProps {
   webSources: WebSource[];
   academicPapers: AcademicPaper[];
+  onDrilldown?: (topic: string) => void;
 }
 
 type TabType = 'web' | 'papers';
 type SortType = 'default' | 'citations';
 
-export function SourceList({ webSources, academicPapers }: SourceListProps) {
+export function SourceList({ webSources, academicPapers, onDrilldown }: SourceListProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabType>('papers');
   const [filter, setFilter] = useState('');
@@ -69,7 +70,7 @@ export function SourceList({ webSources, academicPapers }: SourceListProps) {
           filteredWeb.length > 0 ? filteredWeb.map((s, i) => <WebSourceCard key={i} source={s} />)
             : <p className="text-sm theme-text-muted text-center py-4">{t('sources.noWeb')}</p>
         ) : (
-          filteredPapers.length > 0 ? filteredPapers.map(p => <PaperCard key={p.paperId} paper={p} />)
+          filteredPapers.length > 0 ? filteredPapers.map(p => <PaperCard key={p.paperId} paper={p} onDrilldown={onDrilldown} />)
             : <p className="text-sm theme-text-muted text-center py-4">{t('sources.noPapers')}</p>
         )}
       </div>

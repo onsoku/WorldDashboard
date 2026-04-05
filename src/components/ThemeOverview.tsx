@@ -4,9 +4,10 @@ import type { ResearchOverview } from '@/types/research';
 
 interface ThemeOverviewProps {
   overview: ResearchOverview;
+  onDrilldown?: (finding: string) => void;
 }
 
-export function ThemeOverview({ overview }: ThemeOverviewProps) {
+export function ThemeOverview({ overview, onDrilldown }: ThemeOverviewProps) {
   const { t } = useTranslation();
 
   if (!overview.summary && !overview.keyFindings?.length && !overview.significance) {
@@ -30,7 +31,16 @@ export function ThemeOverview({ overview }: ThemeOverviewProps) {
             {overview.keyFindings.map((finding, i) => (
               <li key={i} className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
-                <span className="text-sm theme-text-secondary">{finding}</span>
+                {onDrilldown ? (
+                  <button onClick={() => onDrilldown(finding)}
+                    className="text-sm theme-text-secondary text-left hover:underline transition-colors"
+                    style={{ cursor: 'pointer' }}
+                    title={t('drilldown.clickToResearch')}>
+                    {finding}
+                  </button>
+                ) : (
+                  <span className="text-sm theme-text-secondary">{finding}</span>
+                )}
               </li>
             ))}
           </ul>

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ExternalLink, Quote, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { ExternalLink, Quote, FileText, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import type { AcademicPaper } from '@/types/research';
 
 interface PaperCardProps {
   paper: AcademicPaper;
+  onDrilldown?: (topic: string) => void;
 }
 
 const OCHIAI_KEYS = [
@@ -16,7 +17,7 @@ const OCHIAI_KEYS = [
   'paper.ochiai.next',
 ] as const;
 
-export function PaperCard({ paper }: PaperCardProps) {
+export function PaperCard({ paper, onDrilldown }: PaperCardProps) {
   const { t } = useTranslation();
   const [expandAbstract, setExpandAbstract] = useState(false);
   const [expandOchiai, setExpandOchiai] = useState(false);
@@ -59,10 +60,18 @@ export function PaperCard({ paper }: PaperCardProps) {
                 const fields = [ochiai.what, ochiai.novelty, ochiai.method, ochiai.validation, ochiai.discussion, ochiai.next];
                 const value = fields[i];
                 if (!value) return null;
+                const isNext = key === 'paper.ochiai.next';
                 return (
                   <div key={key}>
                     <span className="text-xs font-medium theme-text">{t(key)}</span>
                     <p className="text-xs theme-text-secondary mt-0.5">{value}</p>
+                    {isNext && onDrilldown && (
+                      <button onClick={() => onDrilldown(value)}
+                        className="inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded-md transition-colors hover:opacity-80"
+                        style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                        <Search className="w-3 h-3" /> {t('drilldown.researchThis')}
+                      </button>
+                    )}
                   </div>
                 );
               })}

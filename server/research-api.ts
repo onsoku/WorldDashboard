@@ -231,7 +231,7 @@ export function researchApiPlugin(): Plugin {
           req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
           req.on('end', () => {
             try {
-              const { topic, language } = JSON.parse(body);
+              const { topic, language, parentSlug } = JSON.parse(body);
               if (!topic || typeof topic !== 'string') {
                 res.statusCode = 400;
                 res.end(JSON.stringify({ error: 'topic is required' }));
@@ -285,10 +285,14 @@ export function researchApiPlugin(): Plugin {
               };
               const langName = LANG_NAMES[lang] ?? 'Japanese';
 
+              const parentSlugLine = parentSlug
+                ? `\nThis research is a drilldown from parent topic (parentSlug: "${parentSlug}"). Include "parentSlug": "${parentSlug}" in the meta object of the output JSON.\n`
+                : '';
+
               const systemPrompt = [
                 'You are a research assistant.',
                 `Research the following topic thoroughly: "${topic}"`,
-                '',
+                parentSlugLine,
                 `CRITICAL LANGUAGE INSTRUCTION: ALL content you generate (overview summary, key findings, significance, keyword terms, ochiai summaries, snippets) MUST be written in ${langName}. The JSON field names stay in English, but all human-readable text values must be in ${langName}.`,
                 '',
                 'Follow the skill instructions below to conduct research and write results as JSON files.',

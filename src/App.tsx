@@ -8,10 +8,23 @@ import { useResearchData } from '@/hooks/useResearchData';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsProvider } from '@/context/SettingsContext';
 import { Loader2 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 
 function Dashboard() {
   const { topics, selectedSlug, currentData, isLoading, error, refreshTopics, selectTopic } = useResearchData();
   const { t } = useTranslation();
+  const [drilldownRequest, setDrilldownRequest] = useState<{ topic: string; parentSlug: string } | null>(null);
+
+  const handleDrilldown = useCallback((topic: string) => {
+    const existing = topics.find(tp =>
+      tp.topic.toLowerCase() === topic.toLowerCase()
+    );
+    if (existing) {
+      selectTopic(existing.slug);
+    } else {
+      setDrilldownRequest({ topic, parentSlug: currentData?.meta.slug ?? '' });
+    }
+  }, [topics, selectTopic, currentData]);
 
   const sidebar = (
     <TopicSelector
@@ -19,6 +32,8 @@ function Dashboard() {
       selectedSlug={selectedSlug}
       onSelect={selectTopic}
       onRefresh={refreshTopics}
+      drilldownRequest={drilldownRequest}
+      onDrilldownConsumed={() => setDrilldownRequest(null)}
     />
   );
 
@@ -52,16 +67,17 @@ function Dashboard() {
             />
           )}
           {currentData.overview && (
-            <ThemeOverview overview={currentData.overview} />
+            <ThemeOverview overview={currentData.overview} onDrilldown={handleDrilldown} />
           )}
           {currentData.keywords && currentData.keywords.length > 0 && (
-            <KeywordMap keywords={currentData.keywords} />
+            <KeywordMap keywords={currentData.keywords} onDrilldown={handleDrilldown} />
           )}
           {((currentData.webSources && currentData.webSources.length > 0) ||
             (currentData.academicPapers && currentData.academicPapers.length > 0)) && (
             <SourceList
               webSources={currentData.webSources ?? []}
               academicPapers={currentData.academicPapers ?? []}
+              onDrilldown={handleDrilldown}
             />
           )}
         </div>

@@ -1,5 +1,5 @@
 import { RefreshCw, Search, Plus } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { TopicEntry } from '@/types/research';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useSettings } from '@/context/SettingsContext';
@@ -10,6 +10,8 @@ interface TopicSelectorProps {
   selectedSlug: string | null;
   onSelect: (slug: string) => void;
   onRefresh: () => void;
+  drilldownRequest?: { topic: string; parentSlug: string } | null;
+  onDrilldownConsumed?: () => void;
 }
 
 interface ActiveJob {
@@ -18,7 +20,7 @@ interface ActiveJob {
   startedAt: string;
 }
 
-export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh }: TopicSelectorProps) {
+export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed }: TopicSelectorProps) {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const [filter, setFilter] = useState('');
@@ -38,20 +40,28 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh }: Top
 
   const handleError = useCallback((_message: string) => { }, []);
 
-  const handleStartResearch = async () => {
-    const topic = newTopic.trim();
-    if (!topic || activeJob) return;
+  const startResearch = useCallback(async (topic: string, parentSlug?: string) => {
+    if (!topic.trim() || activeJob) return;
     try {
       const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, language: settings.language }),
+        body: JSON.stringify({ topic: topic.trim(), language: settings.language, parentSlug }),
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? 'Failed'); return; }
-      setActiveJob({ jobId: data.jobId, topic, startedAt: new Date().toISOString() });
+      setActiveJob({ jobId: data.jobId, topic: topic.trim(), startedAt: new Date().toISOString() });
     } catch { alert('Connection failed'); }
-  };
+  }, [activeJob, settings.language]);
+
+  const handleStartResearch = () => { startResearch(newTopic); };
+
+  useEffect(() => {
+    if (drilldownRequest && !activeJob) {
+      startResearch(drilldownRequest.topic, drilldownRequest.parentSlug);
+      onDrilldownConsumed?.();
+    }
+  }, [drilldownRequest, activeJob, startResearch, onDrilldownConsumed]);
 
   return (
     <div className="flex flex-col h-full">

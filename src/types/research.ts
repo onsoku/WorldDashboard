@@ -3,6 +3,7 @@ export interface ResearchMeta {
   slug: string;
   createdAt?: string;
   queryTerms?: string[];
+  parentSlug?: string;
 }
 
 export interface ResearchOverview {

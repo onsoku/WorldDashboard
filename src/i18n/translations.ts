@@ -60,6 +60,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.mono': 'モノクロ',
     'empty.title': 'まだトピックがありません',
     'empty.description': '「+ 新規」からテーマを入力してください',
+    'drilldown.clickToResearch': 'クリックで調査開始',
+    'drilldown.researchThis': 'これを調査',
   },
   en: {
     'app.title': 'World Dashboard',
@@ -120,6 +122,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.mono': 'Mono',
     'empty.title': 'No topics yet',
     'empty.description': 'Click "+ New" to start researching',
+    'drilldown.clickToResearch': 'Click to research',
+    'drilldown.researchThis': 'Research this',
   },
   zh: {
     'app.title': 'World Dashboard',
@@ -180,6 +184,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.mono': '黑白',
     'empty.title': '暂无主题',
     'empty.description': '点击"+ 新建"开始研究',
+    'drilldown.clickToResearch': '点击开始研究',
+    'drilldown.researchThis': '研究这个',
   },
   es: {
     'app.title': 'World Dashboard',
@@ -240,6 +246,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.mono': 'Mono',
     'empty.title': 'Sin temas aun',
     'empty.description': 'Haz clic en "+ Nuevo" para investigar',
+    'drilldown.clickToResearch': 'Clic para investigar',
+    'drilldown.researchThis': 'Investigar esto',
   },
   it: {
     'app.title': 'World Dashboard',
@@ -300,6 +308,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.mono': 'Mono',
     'empty.title': 'Nessun argomento',
     'empty.description': 'Clicca "+ Nuovo" per iniziare',
+    'drilldown.clickToResearch': 'Clicca per ricercare',
+    'drilldown.researchThis': 'Ricerca questo',
   },
   fr: {
     'app.title': 'World Dashboard',
@@ -360,6 +370,8 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.mono': 'Mono',
     'empty.title': 'Aucun sujet',
     'empty.description': 'Cliquez sur "+ Nouveau" pour commencer',
+    'drilldown.clickToResearch': 'Cliquez pour rechercher',
+    'drilldown.researchThis': 'Rechercher ceci',
   },
 };
 
