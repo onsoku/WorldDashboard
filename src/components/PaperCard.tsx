@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ExternalLink, Quote, FileText, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import type { AcademicPaper } from '@/types/research';
+import { MarkdownContent } from './MarkdownContent';
 
 interface PaperCardProps {
   paper: AcademicPaper;
@@ -64,7 +65,7 @@ export function PaperCard({ paper, onDrilldown }: PaperCardProps) {
                 return (
                   <div key={key}>
                     <span className="text-xs font-medium theme-text">{t(key)}</span>
-                    <p className="text-xs theme-text-secondary mt-0.5">{value}</p>
+                    <MarkdownContent content={value} className="text-xs theme-text-secondary mt-0.5" />
                     {isNext && onDrilldown && (
                       <button onClick={() => onDrilldown(value)}
                         className="inline-flex items-center gap-1 mt-1 text-xs px-2 py-0.5 rounded-md transition-colors hover:opacity-80"

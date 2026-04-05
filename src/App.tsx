@@ -4,6 +4,7 @@ import { StatsBar } from '@/components/StatsBar';
 import { ThemeOverview } from '@/components/ThemeOverview';
 import { KeywordMap } from '@/components/KeywordMap';
 import { SourceList } from '@/components/SourceList';
+import { ExtensionRenderer } from '@/components/ExtensionRenderer';
 import { useResearchData } from '@/hooks/useResearchData';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsProvider } from '@/context/SettingsContext';
@@ -100,6 +101,9 @@ function Dashboard() {
           )}
           {currentData.keywords && currentData.keywords.length > 0 && (
             <KeywordMap keywords={currentData.keywords} onDrilldown={handleDrilldown} />
+          )}
+          {currentData.extensions && Object.keys(currentData.extensions).length > 0 && (
+            <ExtensionRenderer extensions={currentData.extensions} />
           )}
           {((currentData.webSources && currentData.webSources.length > 0) ||
             (currentData.academicPapers && currentData.academicPapers.length > 0)) && (

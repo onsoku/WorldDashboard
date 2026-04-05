@@ -1,6 +1,7 @@
 import { CheckCircle, Info } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import type { ResearchOverview } from '@/types/research';
+import { MarkdownContent } from './MarkdownContent';
 
 interface ThemeOverviewProps {
   overview: ResearchOverview;
@@ -19,9 +20,7 @@ export function ThemeOverview({ overview, onDrilldown }: ThemeOverviewProps) {
       {overview.summary && (
         <div>
           <h3 className="text-lg font-semibold theme-text mb-3">{t('overview.title')}</h3>
-          {overview.summary.split('\n').filter(Boolean).map((paragraph, i) => (
-            <p key={i} className="text-sm theme-text-secondary leading-relaxed mb-3 last:mb-0">{paragraph}</p>
-          ))}
+          <MarkdownContent content={overview.summary} />
         </div>
       )}
       {overview.keyFindings && overview.keyFindings.length > 0 && (
@@ -52,7 +51,7 @@ export function ThemeOverview({ overview, onDrilldown }: ThemeOverviewProps) {
             <Info className="w-4 h-4 mt-0.5 flex-shrink-0 theme-text-info" />
             <div>
               <h4 className="text-sm font-medium theme-text-info mb-1">{t('overview.whyImportant')}</h4>
-              <p className="text-sm theme-text-info">{overview.significance}</p>
+              <MarkdownContent content={overview.significance} className="theme-text-info" />
             </div>
           </div>
         </div>
