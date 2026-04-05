@@ -1,21 +1,27 @@
-import { Globe, BookOpen, Tags, Calendar } from 'lucide-react';
+import { Globe, BookOpen, Tags, Calendar, type LucideIcon } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
-import type { ResearchData } from '@/types/research';
+import type { ResearchStatistics } from '@/types/research';
 
 interface StatsBarProps {
-  statistics: ResearchData['statistics'];
+  statistics: ResearchStatistics;
   keywordCount: number;
 }
 
 export function StatsBar({ statistics, keywordCount }: StatsBarProps) {
   const { t } = useTranslation();
 
-  const cards = [
-    { icon: Globe, label: t('stats.webSources'), value: statistics.totalWebSources, color: 'var(--color-text-link)' },
-    { icon: BookOpen, label: t('stats.papers'), value: statistics.totalPapers, color: 'var(--color-success)' },
-    { icon: Tags, label: t('stats.keywords'), value: keywordCount, color: 'var(--color-warning)' },
-    { icon: Calendar, label: t('stats.yearRange'), value: `${statistics.yearRange.min}\u2013${statistics.yearRange.max}`, color: 'var(--color-primary)' },
-  ];
+  const cards: { icon: LucideIcon; label: string; value: string | number; color: string }[] = [];
+
+  if (statistics.totalWebSources != null) {
+    cards.push({ icon: Globe, label: t('stats.webSources'), value: statistics.totalWebSources, color: 'var(--color-text-link)' });
+  }
+  if (statistics.totalPapers != null) {
+    cards.push({ icon: BookOpen, label: t('stats.papers'), value: statistics.totalPapers, color: 'var(--color-success)' });
+  }
+  cards.push({ icon: Tags, label: t('stats.keywords'), value: keywordCount, color: 'var(--color-warning)' });
+  if (statistics.yearRange) {
+    cards.push({ icon: Calendar, label: t('stats.yearRange'), value: `${statistics.yearRange.min}\u2013${statistics.yearRange.max}`, color: 'var(--color-primary)' });
+  }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

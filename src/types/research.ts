@@ -1,24 +1,65 @@
+export interface ResearchMeta {
+  topic: string;
+  slug: string;
+  createdAt?: string;
+  queryTerms?: string[];
+}
+
+export interface ResearchOverview {
+  summary?: string;
+  keyFindings?: string[];
+  significance?: string;
+}
+
+export interface ResearchStatistics {
+  totalWebSources?: number;
+  totalPapers?: number;
+  yearRange?: { min: number; max: number };
+  topAuthors?: string[];
+}
+
+export interface MapExtension {
+  type: 'map';
+  locations: { name: string; lat: number; lng: number; description?: string }[];
+}
+
+export interface TimelineExtension {
+  type: 'timeline';
+  events: { date: string; title: string; description?: string }[];
+}
+
+export interface TableExtension {
+  type: 'table';
+  headers: string[];
+  rows: string[][];
+}
+
+export interface ChartExtension {
+  type: 'chart';
+  chartType: 'bar' | 'line' | 'pie';
+  labels: string[];
+  data: number[];
+}
+
+export interface ProfileExtension {
+  type: 'profile';
+  name: string;
+  image?: string;
+  bio?: string;
+  links?: { label: string; url: string }[];
+}
+
+export type Extension = MapExtension | TimelineExtension | TableExtension | ChartExtension | ProfileExtension;
+
 export interface ResearchData {
-  meta: {
-    topic: string;
-    slug: string;
-    createdAt: string;
-    queryTerms: string[];
-  };
-  overview: {
-    summary: string;
-    keyFindings: string[];
-    significance: string;
-  };
-  keywords: KeywordEntry[];
-  webSources: WebSource[];
-  academicPapers: AcademicPaper[];
-  statistics: {
-    totalWebSources: number;
-    totalPapers: number;
-    yearRange: { min: number; max: number };
-    topAuthors: string[];
-  };
+  meta: ResearchMeta;
+  overview?: ResearchOverview;
+  keywords?: KeywordEntry[];
+  webSources?: WebSource[];
+  academicPapers?: AcademicPaper[];
+  statistics?: ResearchStatistics;
+  extensions?: Record<string, Extension>;
+  [key: string]: unknown;
 }
 
 export interface KeywordEntry {

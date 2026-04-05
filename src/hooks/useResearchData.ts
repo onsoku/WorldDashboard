@@ -28,6 +28,9 @@ export function useResearchData() {
       const res = await fetch(`/data/${slug}.json`);
       if (!res.ok) throw new Error(`トピック "${slug}" のデータが見つかりません`);
       const data: ResearchData = await res.json();
+      if (!data?.meta?.topic || !data?.meta?.slug) {
+        throw new Error(`無効なデータ: meta.topic と meta.slug は必須です`);
+      }
       setCurrentData(data);
     } catch (e) {
       setCurrentData(null);

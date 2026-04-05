@@ -45,16 +45,25 @@ function Dashboard() {
 
       {!isLoading && !error && currentData && (
         <div className="space-y-6">
-          <StatsBar
-            statistics={currentData.statistics}
-            keywordCount={currentData.keywords.length}
-          />
-          <ThemeOverview overview={currentData.overview} />
-          <KeywordMap keywords={currentData.keywords} />
-          <SourceList
-            webSources={currentData.webSources}
-            academicPapers={currentData.academicPapers}
-          />
+          {currentData.statistics && (
+            <StatsBar
+              statistics={currentData.statistics}
+              keywordCount={currentData.keywords?.length ?? 0}
+            />
+          )}
+          {currentData.overview && (
+            <ThemeOverview overview={currentData.overview} />
+          )}
+          {currentData.keywords && currentData.keywords.length > 0 && (
+            <KeywordMap keywords={currentData.keywords} />
+          )}
+          {((currentData.webSources && currentData.webSources.length > 0) ||
+            (currentData.academicPapers && currentData.academicPapers.length > 0)) && (
+            <SourceList
+              webSources={currentData.webSources ?? []}
+              academicPapers={currentData.academicPapers ?? []}
+            />
+          )}
         </div>
       )}
     </Layout>
