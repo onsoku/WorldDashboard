@@ -31,6 +31,10 @@
 - **Theme Switching** — Light, Dark, and Monochrome themes
 - **Persistent Settings** — Preferences saved to localStorage
 - **Growing Knowledge Base** — Topics saved locally and revisitable anytime
+- **Drilldown Navigation** — Click any keyword in the treemap, key finding in overview, or "next paper" suggestion to instantly start a new research on that topic (parent-child tracking via `meta.parentSlug`)
+- **Import/Export** — Export button (↓) in header downloads current topic as JSON; import button (↑) in sidebar or drag & drop JSON files onto the topic list
+- **Flexible Schema** — Only `meta.topic` and `meta.slug` are required; all other fields optional. Extensions system for theme-specific data (map, timeline, table, chart, profile)
+- **Rich Display** — Markdown rendering (tables, bold, headings, lists) in overview and paper summaries. Extension renderers for table, chart (bar/line/pie via Recharts), and timeline
 
 ## Tech Stack
 
@@ -38,6 +42,7 @@
 |-------|-----------|
 | Frontend | React 18 + TypeScript + Vite 6 |
 | Styling | Tailwind CSS 4 |
+| Markdown | react-markdown + remark-gfm |
 | Charts | Recharts |
 | Icons | Lucide React |
 | AI Agent | Claude Code CLI |
@@ -69,7 +74,9 @@ Open http://localhost:5173
 3. Click **"Start Research"** — progress shown in real-time
 4. Dashboard displays results when complete
 5. Switch between past topics in the sidebar
-6. Change theme/language via the ⚙️ icon
+6. **Drilldown** — Click any keyword or suggestion to research a related topic
+7. **Export** — Click ↓ in the header to download a topic as JSON; **Import** — Click ↑ in the sidebar or drag & drop JSON files
+8. Change theme/language via the ⚙️ icon
 
 ## Project Structure
 

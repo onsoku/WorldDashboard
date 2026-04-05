@@ -14,6 +14,10 @@
 - **Changement de Theme** — Themes clair, sombre et monochrome
 - **Parametres Persistants** — Preferences sauvegardees dans localStorage
 - **Base de Connaissances Croissante** — Chaque sujet sauvegarde localement et consultable a tout moment
+- **Navigation Drilldown** — Cliquez sur n'importe quel mot-cle dans la carte, decouverte cle dans l'apercu ou suggestion "prochain article" pour lancer instantanement une nouvelle recherche (suivi parent-enfant via `meta.parentSlug`)
+- **Import/Export** — Bouton exporter (↓) dans l'en-tete telecharge le sujet courant en JSON ; bouton importer (↑) dans la barre laterale ou glissez-deposez des fichiers JSON
+- **Schema Flexible** — Seuls `meta.topic` et `meta.slug` sont obligatoires ; tous les autres champs sont optionnels. Systeme d'extensions pour les donnees thematiques (carte, chronologie, tableau, graphique, profil)
+- **Affichage Enrichi** — Rendu Markdown (tableaux, gras, titres, listes) dans l'apercu et les resumes d'articles. Renderers d'extensions pour tableau, graphique (barres/lignes/camembert via Recharts) et chronologie
 
 ## Stack Technique
 
@@ -21,6 +25,7 @@
 |--------|-----------|
 | Frontend | React 18 + TypeScript + Vite 6 |
 | Styles | Tailwind CSS 4 |
+| Markdown | react-markdown + remark-gfm |
 | Graphiques | Recharts |
 | Icones | Lucide React |
 | Agent IA | Claude Code CLI |
@@ -52,7 +57,9 @@ Ouvrez http://localhost:5173 dans votre navigateur
 3. Cliquez sur **"Demarrer la recherche"** — la progression s'affiche en temps reel
 4. Le tableau de bord affiche les resultats une fois termine
 5. Basculez entre les sujets precedents dans la barre laterale
-6. Changez le theme/langue via l'icone ⚙️
+6. **Drilldown** — Cliquez sur un mot-cle ou une suggestion pour rechercher un sujet connexe
+7. **Exporter** — Cliquez sur ↓ dans l'en-tete pour telecharger le JSON ; **Importer** — Cliquez sur ↑ dans la barre laterale ou glissez-deposez des fichiers JSON
+8. Changez le theme/langue via l'icone ⚙️
 
 ## Licence
 

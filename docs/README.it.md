@@ -14,6 +14,10 @@
 - **Cambio Tema** — Temi chiaro, scuro e monocromatico
 - **Impostazioni Persistenti** — Preferenze salvate in localStorage
 - **Base di Conoscenza in Crescita** — Ogni argomento salvato localmente e consultabile in qualsiasi momento
+- **Navigazione Drilldown** — Clicca su qualsiasi parola chiave nella mappa, scoperta chiave nella panoramica o suggerimento "prossimo articolo" per avviare immediatamente una nuova ricerca (tracciamento genitore-figlio tramite `meta.parentSlug`)
+- **Importa/Esporta** — Pulsante esporta (↓) nell'intestazione scarica l'argomento corrente come JSON; pulsante importa (↑) nella barra laterale o trascina e rilascia file JSON
+- **Schema Flessibile** — Solo `meta.topic` e `meta.slug` sono obbligatori; tutti gli altri campi sono opzionali. Sistema di estensioni per dati tematici (mappa, timeline, tabella, grafico, profilo)
+- **Visualizzazione Avanzata** — Rendering Markdown (tabelle, grassetto, intestazioni, elenchi) nella panoramica e nei riassunti degli articoli. Renderer di estensioni per tabella, grafico (barre/linee/torta tramite Recharts) e timeline
 
 ## Stack Tecnologico
 
@@ -21,6 +25,7 @@
 |---------|-----------|
 | Frontend | React 18 + TypeScript + Vite 6 |
 | Stili | Tailwind CSS 4 |
+| Markdown | react-markdown + remark-gfm |
 | Grafici | Recharts |
 | Icone | Lucide React |
 | Agente IA | Claude Code CLI |
@@ -52,7 +57,9 @@ Apri http://localhost:5173 nel browser
 3. Clicca **"Inizia ricerca"** — il progresso viene mostrato in tempo reale
 4. La dashboard mostra i risultati al completamento
 5. Passa tra gli argomenti precedenti nella barra laterale
-6. Cambia tema/lingua con l'icona ⚙️
+6. **Drilldown** — Clicca su qualsiasi parola chiave o suggerimento per ricercare un argomento correlato
+7. **Esporta** — Clicca ↓ nell'intestazione per scaricare JSON; **Importa** — Clicca ↑ nella barra laterale o trascina e rilascia file JSON
+8. Cambia tema/lingua con l'icona ⚙️
 
 ## Licenza
 
