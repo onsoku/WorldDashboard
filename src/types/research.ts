@@ -6,6 +6,7 @@ export interface ResearchMeta {
   parentSlug?: string;
   sourceSlug?: string;
   sourceLang?: string;
+  lang?: string;
 }
 
 export interface ResearchOverview {
@@ -21,17 +22,22 @@ export interface ResearchStatistics {
   topAuthors?: string[];
 }
 
-export interface MapExtension {
+export interface BaseExtension {
+  title?: string;
+  description?: string;
+}
+
+export interface MapExtension extends BaseExtension {
   type: 'map';
   locations: { name: string; lat: number; lng: number; description?: string }[];
 }
 
-export interface TimelineExtension {
+export interface TimelineExtension extends BaseExtension {
   type: 'timeline';
   events: { date: string; title: string; description?: string }[];
 }
 
-export interface TableExtension {
+export interface TableExtension extends BaseExtension {
   type: 'table';
   headers: string[];
   rows: string[][];
@@ -42,14 +48,14 @@ export interface ChartSeries {
   values: number[];
 }
 
-export interface ChartExtension {
+export interface ChartExtension extends BaseExtension {
   type: 'chart';
   chartType: 'bar' | 'line' | 'pie' | 'area' | 'radar' | 'scatter' | 'stackedBar';
   labels: string[];
   data: number[] | ChartSeries[];
 }
 
-export interface ProfileExtension {
+export interface ProfileExtension extends BaseExtension {
   type: 'profile';
   name: string;
   image?: string;

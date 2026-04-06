@@ -5,7 +5,7 @@ import {
   ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { useTranslation } from '@/i18n/useTranslation';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { MapContainer, TileLayer, Marker as LeafletMarker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -264,13 +264,17 @@ function MapRenderer({ ext }: { ext: Extract<Extension, { type: 'map' }> }) {
 }
 
 export function ExtensionRenderer({ extensions }: ExtensionRendererProps) {
-  const { t } = useTranslation();
 
   return (
     <>
       {Object.entries(extensions).map(([key, ext]) => (
         <div key={key} className="theme-bg-card rounded-lg border theme-border p-6">
-          <h3 className="text-lg font-semibold theme-text mb-4">{t(`extension.${key}`)}</h3>
+          <h3 className="text-lg font-semibold theme-text mb-2">{ext.title ?? key}</h3>
+          {ext.description && (
+            <div className="mb-4">
+              <MarkdownContent content={ext.description} className="text-sm theme-text-secondary" />
+            </div>
+          )}
           {ext.type === 'table' && <TableRenderer ext={ext} />}
           {ext.type === 'chart' && <ChartRenderer ext={ext} />}
           {ext.type === 'timeline' && <TimelineRenderer ext={ext} />}

@@ -4,7 +4,7 @@ import { useTranslation } from '@/i18n/useTranslation';
 import type { Language } from '@/context/SettingsContext';
 
 interface TranslateDialogProps {
-  currentLang?: string;
+  contentLang?: string;
   onTranslate: (targetLang: string) => void;
   onClose: () => void;
 }
@@ -18,11 +18,11 @@ const LANGUAGES: { code: Language; label: string }[] = [
   { code: 'fr', label: 'Français' },
 ];
 
-export function TranslateDialog({ currentLang, onTranslate, onClose }: TranslateDialogProps) {
+export function TranslateDialog({ contentLang, onTranslate, onClose }: TranslateDialogProps) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<string>('');
 
-  const available = LANGUAGES.filter(l => l.code !== currentLang);
+  const available = LANGUAGES.filter(l => l.code !== contentLang);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
