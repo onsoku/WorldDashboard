@@ -1,4 +1,4 @@
-# World Dashboard
+# World Dashboard v1.0
 
 **Your Personal Encyclopedia** — An AI-powered research dashboard that investigates any topic using web search and academic papers, then displays the results in an interactive dashboard.
 
@@ -38,6 +38,10 @@
 - **Version-managed Updates** — Update existing topics with new information while preserving version history. Previous versions are kept intact and browsable. Corrections are tracked when facts change
 - **Culture-aware Translation** — Translate topics to any of 6 supported languages with automatic cultural difference assessment. Goes beyond word-for-word translation with supplementary web search when cultural context differs
 - **Extended Charts & Maps** — 7 chart types (bar, line, pie, area, radar, scatter, stacked bar) with multi-series support. Interactive maps via Leaflet/OpenStreetMap with markers and popups
+- **Structured Knowledge Pages** — Each topic is planned with a theme-specific structure covering understanding, context, and next steps, guided by the encyclopedia's design principles
+- **Parallel Job Execution** — Queue up to 3 research/translation jobs simultaneously with real-time progress tracking for each
+- **IME Support** — Full CJK input method support in topic input fields, preventing accidental submission during kanji/hanzi conversion
+- **JSON Validation & Repair** — Automatic validation and repair of generated JSON data files to prevent parse errors
 
 ## Tech Stack
 
@@ -76,13 +80,14 @@ Open http://localhost:5173
 1. Click **"+ New"** in the sidebar
 2. Enter a research topic
 3. Click **"Start Research"** — progress shown in real-time
-4. Dashboard displays results when complete
+4. Dashboard displays results when complete (overview, keywords, sources)
 5. Switch between past topics in the sidebar
 6. **Drilldown** — Click any keyword or suggestion to research a related topic
-7. **Export** — Click ↓ in the header to download a topic as JSON; **Import** — Click ↑ in the sidebar or drag & drop JSON files
-8. **Update** — Click the update button (↻) to refresh a topic with the latest information
-9. **Translate** — Click the translate button to convert a topic to another language
-10. Change theme/language via the ⚙️ icon
+7. **Export** — Click the download icon in the header to save a topic as JSON; **Import** — Click the upload icon in the sidebar or drag & drop JSON files
+8. **Update** — Click the refresh icon to update a topic with the latest information
+9. **Translate** — Click the translate icon to convert a topic to another language
+10. **Parallel Jobs** — Start multiple research tasks without waiting for the previous one to finish
+11. Change theme/language via the settings icon
 
 ## Project Structure
 

@@ -1,4 +1,4 @@
-# World Dashboard
+# World Dashboard v1.0
 
 **La Tua Enciclopedia Personale** — Una dashboard di ricerca alimentata dall'IA che indaga qualsiasi argomento utilizzando ricerca web e articoli accademici, mostrando i risultati in una dashboard interattiva.
 

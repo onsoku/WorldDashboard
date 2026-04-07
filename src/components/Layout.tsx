@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { BookOpen, Download, RefreshCw, Languages } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsPanel } from './SettingsPanel';
+import { APP_VERSION } from '@/version';
 
 interface LayoutProps {
   sidebar: ReactNode;
@@ -22,6 +23,7 @@ export function Layout({ sidebar, children, topicName, onExport, onUpdate, onTra
           <div className="flex items-center gap-2">
             <BookOpen className="w-6 h-6" style={{ color: 'var(--color-primary)' }} />
             <h1 className="text-lg font-bold theme-text">{t('app.title')}</h1>
+            <span className="text-xs theme-text-muted">v{APP_VERSION}</span>
           </div>
           <p className="text-xs theme-text-muted mt-1">{t('app.subtitle')}</p>
         </div>

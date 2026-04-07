@@ -27,7 +27,14 @@ export function useResearchData() {
     try {
       const res = await fetch(`/data/${slug}.json`);
       if (!res.ok) throw new Error(`トピック "${slug}" のデータが見つかりません`);
-      const data: ResearchData = await res.json();
+      const text = await res.text();
+      let data: ResearchData;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        const msg = parseErr instanceof SyntaxError ? parseErr.message : String(parseErr);
+        throw new Error(`JSONパースエラー (${slug}.json): ${msg}`);
+      }
       if (!data?.meta?.topic || !data?.meta?.slug) {
         throw new Error(`無効なデータ: meta.topic と meta.slug は必須です`);
       }

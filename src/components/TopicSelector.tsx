@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { TopicEntry } from '@/types/research';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useSettings } from '@/context/SettingsContext';
-import { ResearchProgress } from './ResearchProgress';
+import { JobQueue } from './JobQueue';
 
 interface TopicSelectorProps {
   topics: TopicEntry[];
@@ -31,24 +31,28 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
   const [filter, setFilter] = useState('');
   const [newTopic, setNewTopic] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
-  const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
+  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composingRef = useRef(false);
 
   const filtered = topics.filter(tp =>
     tp.topic.toLowerCase().includes(filter.toLowerCase())
   );
 
-  const handleComplete = useCallback(() => {
-    setActiveJob(null);
-    setNewTopic('');
+  const handleJobComplete = useCallback((jobId: string) => {
+    setActiveJobs(prev => prev.filter(j => j.jobId !== jobId));
     onRefresh();
   }, [onRefresh]);
 
-  const handleError = useCallback((_message: string) => { }, []);
+  const handleJobError = useCallback((_jobId: string, _message: string) => { }, []);
+
+  const handleJobDismiss = useCallback((jobId: string) => {
+    setActiveJobs(prev => prev.filter(j => j.jobId !== jobId));
+  }, []);
 
   const startResearch = useCallback(async (topic: string, opts?: { parentSlug?: string; mode?: string; slug?: string }) => {
-    if (!topic.trim() || activeJob) return;
+    if (!topic.trim()) return;
     try {
       const res = await fetch('/api/research', {
         method: 'POST',
@@ -63,28 +67,28 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? 'Failed'); return; }
-      setActiveJob({ jobId: data.jobId, topic: topic.trim(), startedAt: new Date().toISOString() });
+      setActiveJobs(prev => [...prev, { jobId: data.jobId, topic: topic.trim(), startedAt: new Date().toISOString() }]);
+      setNewTopic('');
     } catch { alert('Connection failed'); }
-  }, [activeJob, settings.language]);
+  }, [settings.language]);
 
   const handleStartResearch = () => { startResearch(newTopic); };
 
   useEffect(() => {
-    if (drilldownRequest && !activeJob) {
+    if (drilldownRequest) {
       startResearch(drilldownRequest.topic, { parentSlug: drilldownRequest.parentSlug });
       onDrilldownConsumed?.();
     }
-  }, [drilldownRequest, activeJob, startResearch, onDrilldownConsumed]);
+  }, [drilldownRequest, startResearch, onDrilldownConsumed]);
 
   useEffect(() => {
-    if (updateRequest && !activeJob) {
+    if (updateRequest) {
       startResearch(updateRequest.topic, { mode: 'update', slug: updateRequest.slug });
       onUpdateConsumed?.();
     }
-  }, [updateRequest, activeJob, startResearch, onUpdateConsumed]);
+  }, [updateRequest, startResearch, onUpdateConsumed]);
 
   const startTranslate = useCallback(async (sourceSlug: string, targetLang: string) => {
-    if (activeJob) return;
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
@@ -93,16 +97,16 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? 'Failed'); return; }
-      setActiveJob({ jobId: data.jobId, topic: data.topic, startedAt: new Date().toISOString() });
+      setActiveJobs(prev => [...prev, { jobId: data.jobId, topic: data.topic, startedAt: new Date().toISOString() }]);
     } catch { alert('Connection failed'); }
-  }, [activeJob]);
+  }, []);
 
   useEffect(() => {
-    if (translateRequest && !activeJob) {
+    if (translateRequest) {
       startTranslate(translateRequest.sourceSlug, translateRequest.targetLang);
       onTranslateConsumed?.();
     }
-  }, [translateRequest, activeJob, startTranslate, onTranslateConsumed]);
+  }, [translateRequest, startTranslate, onTranslateConsumed]);
 
   return (
     <div className="flex flex-col h-full">
@@ -111,8 +115,8 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
           <button onClick={onRefresh} className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors theme-primary-light theme-primary-text hover:theme-bg-active">
             <RefreshCw className="w-3.5 h-3.5" /> {t('sidebar.refresh')}
           </button>
-          <button onClick={() => setShowNewForm(!showNewForm)} disabled={!!activeJob}
-            className={`flex items-center justify-center gap-1 px-3 py-1.5 text-sm rounded-md transition-colors disabled:opacity-40 ${showNewForm ? 'theme-primary text-white' : 'theme-primary-light theme-primary-text hover:theme-bg-active'}`}>
+          <button onClick={() => setShowNewForm(!showNewForm)}
+            className={`flex items-center justify-center gap-1 px-3 py-1.5 text-sm rounded-md transition-colors ${showNewForm ? 'theme-primary text-white' : 'theme-primary-light theme-primary-text hover:theme-bg-active'}`}>
             <Plus className="w-3.5 h-3.5" /> {t('sidebar.new')}
           </button>
           {onImport && (
@@ -127,12 +131,14 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
           )}
         </div>
 
-        {showNewForm && !activeJob && (
+        {showNewForm && (
           <div className="theme-bg-active rounded-lg p-3 space-y-2">
             <input type="text" value={newTopic} onChange={e => setNewTopic(e.target.value)}
               placeholder={t('sidebar.inputPlaceholder')}
               className="w-full px-3 py-1.5 text-sm border theme-border rounded-md theme-bg-input theme-text focus:outline-none focus:ring-2 theme-ring"
-              onKeyDown={e => { if (e.key === 'Enter') handleStartResearch(); }} />
+              onCompositionStart={() => { composingRef.current = true; }}
+              onCompositionEnd={() => { composingRef.current = false; }}
+              onKeyDown={e => { if (e.key === 'Enter' && !composingRef.current) handleStartResearch(); }} />
             <button onClick={handleStartResearch} disabled={!newTopic.trim()}
               className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-sm text-white theme-primary rounded-md disabled:opacity-40 disabled:cursor-not-allowed transition-colors hover:opacity-90">
               <Search className="w-3.5 h-3.5" /> {t('sidebar.startResearch')}
@@ -140,10 +146,12 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
           </div>
         )}
 
-        {activeJob && (
-          <ResearchProgress jobId={activeJob.jobId} topic={activeJob.topic} startedAt={activeJob.startedAt}
-            onComplete={handleComplete} onError={handleError} />
-        )}
+        <JobQueue
+          jobs={activeJobs}
+          onJobComplete={handleJobComplete}
+          onJobError={handleJobError}
+          onDismiss={handleJobDismiss}
+        />
 
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 theme-text-muted" />

@@ -1,4 +1,4 @@
-# World Dashboard
+# World Dashboard v1.0
 
 **Votre Encyclopedie Personnelle** — Un tableau de bord de recherche alimente par l'IA qui explore n'importe quel sujet en utilisant la recherche web et les articles academiques, puis affiche les resultats dans un tableau de bord interactif.
 

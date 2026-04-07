@@ -73,38 +73,38 @@
 }
 
 [data-theme="mono"] {
-  --color-bg: #fafafa;
-  --color-bg-card: #ffffff;
-  --color-bg-sidebar: #f5f5f5;
-  --color-bg-header: rgba(250,250,250,0.85);
-  --color-bg-hover: #f0f0f0;
-  --color-bg-active: #e8e8e8;
-  --color-bg-input: #ffffff;
-  --color-bg-badge-blue: #e5e5e5;
-  --color-bg-badge-green: #e5e5e5;
-  --color-bg-badge-amber: #e5e5e5;
-  --color-bg-badge-purple: #e5e5e5;
-  --color-bg-info: #f0f0f0;
-  --color-bg-progress: #e5e5e5;
+  --color-bg: #c8c8c8;
+  --color-bg-card: #d8d8d8;
+  --color-bg-sidebar: #bfbfbf;
+  --color-bg-header: rgba(200,200,200,0.9);
+  --color-bg-hover: #d0d0d0;
+  --color-bg-active: #b8b8b8;
+  --color-bg-input: #e0e0e0;
+  --color-bg-badge-blue: #b0b0b0;
+  --color-bg-badge-green: #b0b0b0;
+  --color-bg-badge-amber: #b0b0b0;
+  --color-bg-badge-purple: #b0b0b0;
+  --color-bg-info: #d0d0d0;
+  --color-bg-progress: #a8a8a8;
   --color-text: #1a1a1a;
-  --color-text-secondary: #525252;
-  --color-text-muted: #a3a3a3;
-  --color-text-link: #171717;
+  --color-text-secondary: #3a3a3a;
+  --color-text-muted: #6b6b6b;
+  --color-text-link: #111111;
   --color-text-link-hover: #000000;
-  --color-text-info: #404040;
-  --color-border: #d4d4d4;
-  --color-border-active: #171717;
-  --color-border-info: #d4d4d4;
-  --color-primary: #171717;
-  --color-primary-hover: #000000;
-  --color-primary-light: #f0f0f0;
-  --color-primary-text: #171717;
-  --color-success: #404040;
-  --color-success-light: #f0f0f0;
-  --color-error: #525252;
-  --color-error-light: #f5f5f5;
-  --color-warning: #525252;
-  --color-warning-light: #f5f5f5;
+  --color-text-info: #2a2a2a;
+  --color-border: #a0a0a0;
+  --color-border-active: #333333;
+  --color-border-info: #a0a0a0;
+  --color-primary: #333333;
+  --color-primary-hover: #1a1a1a;
+  --color-primary-light: #d0d0d0;
+  --color-primary-text: #1a1a1a;
+  --color-success: #3a3a3a;
+  --color-success-light: #d0d0d0;
+  --color-error: #4a4a4a;
+  --color-error-light: #c8c8c8;
+  --color-warning: #4a4a4a;
+  --color-warning-light: #c8c8c8;
 }
 
 /* ===== Theme Utility Classes ===== */

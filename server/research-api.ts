@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite'
 import { spawn } from 'child_process'
-import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import path from 'path'
 
 interface LogEntry {
@@ -118,6 +118,36 @@ function toSlug(_topic: string): string {
 
 function addLog(job: ResearchJob, phase: LogEntry['phase'], message: string) {
   job.logs.push({ timestamp: new Date().toISOString(), phase, message });
+}
+
+/**
+ * Validate a JSON file written by Claude CLI and attempt to repair common issues.
+ * Returns true if the file is valid (or was successfully repaired).
+ */
+function validateAndRepairJson(filePath: string): { valid: boolean; error?: string } {
+  if (!existsSync(filePath)) return { valid: false, error: 'File not found' };
+  const raw = readFileSync(filePath, 'utf-8');
+  try {
+    JSON.parse(raw);
+    return { valid: true };
+  } catch (e) {
+    const errMsg = e instanceof SyntaxError ? e.message : String(e);
+    console.warn(`[research-api] Invalid JSON in ${filePath}: ${errMsg}`);
+    // Attempt repair: fix common issues from LLM-generated JSON
+    try {
+      let fixed = raw;
+      // Remove trailing commas before } or ]
+      fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+      // Remove control characters inside strings (except \n \r \t which are valid escaped)
+      fixed = fixed.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+      JSON.parse(fixed);
+      writeFileSync(filePath, fixed, 'utf-8');
+      console.log(`[research-api] Repaired JSON: ${filePath}`);
+      return { valid: true };
+    } catch {
+      return { valid: false, error: errMsg };
+    }
+  }
 }
 
 function parseStreamLine(line: string, job: ResearchJob) {
@@ -263,13 +293,13 @@ export function researchApiPlugin(): Plugin {
               return;
             }
 
-            // Check for running jobs
-            for (const [, job] of jobs) {
-              if (job.status === 'running') {
-                res.statusCode = 409;
-                res.end(JSON.stringify({ error: '別の調査が実行中です', runningTopic: job.topic }));
-                return;
-              }
+            // Check concurrent job limit
+            const MAX_CONCURRENT = 3;
+            const runningJobs = [...jobs.values()].filter(j => j.status === 'running');
+            if (runningJobs.length >= MAX_CONCURRENT) {
+              res.statusCode = 409;
+              res.end(JSON.stringify({ error: `同時実行数の上限（${MAX_CONCURRENT}）に達しています`, runningTopics: runningJobs.map(j => j.topic) }));
+              return;
             }
 
             const projectRoot = process.cwd();
@@ -411,6 +441,14 @@ export function researchApiPlugin(): Plugin {
                   addLog(job, 'error', job.message);
                 }
               }
+              // Validate written JSON file after translation completes
+              if (job.status === 'completed') {
+                const fp = path.join(dataDir, `${newSlug}.json`);
+                const { valid, error: jsonErr } = validateAndRepairJson(fp);
+                if (!valid) {
+                  addLog(job, 'error', `JSONバリデーションエラー (${newSlug}.json): ${jsonErr}`);
+                }
+              }
             });
 
             child.on('error', (err) => {
@@ -474,12 +512,12 @@ export function researchApiPlugin(): Plugin {
 
               const jobId = toSlug(topic) + '-' + Date.now();
 
-              for (const [, job] of jobs) {
-                if (job.status === 'running') {
-                  res.statusCode = 409;
-                  res.end(JSON.stringify({ error: '別の調査が実行中です', runningTopic: job.topic }));
-                  return;
-                }
+              const MAX_CONCURRENT = 3;
+              const running = [...jobs.values()].filter(j => j.status === 'running');
+              if (running.length >= MAX_CONCURRENT) {
+                res.statusCode = 409;
+                res.end(JSON.stringify({ error: `同時実行数の上限（${MAX_CONCURRENT}）に達しています`, runningTopics: running.map(j => j.topic) }));
+                return;
               }
 
               const job: ResearchJob = {
@@ -643,6 +681,24 @@ export function researchApiPlugin(): Plugin {
                     const errDetail = stderrBuffer.trim().slice(0, 300);
                     job.message = errDetail || `Process exited with code ${code}`;
                     addLog(job, 'error', job.message);
+                  }
+                }
+                // Validate written JSON files after job completes
+                if (job.status === 'completed') {
+                  const slug = isUpdate ? existingSlug : undefined;
+                  // Find the most recently written JSON file from logs
+                  const writeLog = job.logs.filter(l => l.message.includes(msg(lang, 'data-write')));
+                  if (writeLog.length > 0) {
+                    // Glob for JSON files matching the topic
+                    const files = require('fs').readdirSync(dataDir);
+                    for (const f of files) {
+                      if (!f.endsWith('.json') || f === 'index.json') continue;
+                      const fp = path.join(dataDir, f);
+                      const { valid, error: jsonErr } = validateAndRepairJson(fp);
+                      if (!valid) {
+                        addLog(job, 'error', `JSONバリデーションエラー (${f}): ${jsonErr}`);
+                      }
+                    }
                   }
                 }
               });

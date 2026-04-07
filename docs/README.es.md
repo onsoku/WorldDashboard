@@ -1,4 +1,4 @@
-# World Dashboard
+# World Dashboard v1.0
 
 **Tu Enciclopedia Personal** — Un panel de investigacion impulsado por IA que investiga cualquier tema utilizando busqueda web y articulos academicos, y muestra los resultados en un panel interactivo.
 

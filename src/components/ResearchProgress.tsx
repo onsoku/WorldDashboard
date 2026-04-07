@@ -53,9 +53,8 @@ export function ResearchProgress({ jobId, topic, startedAt, onComplete, onError 
   const timeStr = m > 0 ? `${m}m${s}s` : `${s}s`;
 
   return (
-    <div className="theme-bg-card border theme-border rounded-lg p-4 space-y-3">
+    <div className="p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium theme-text truncate">{topic}</h4>
         <span className="text-xs theme-text-muted flex-shrink-0">{timeStr}</span>
       </div>
 

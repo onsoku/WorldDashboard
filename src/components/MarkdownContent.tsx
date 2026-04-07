@@ -8,22 +8,25 @@ interface MarkdownContentProps {
 }
 
 /**
- * Convert **text** / __text__ to <strong>text</strong> when adjacent to CJK
- * characters, where the CommonMark parser fails to recognise emphasis boundaries.
- * Non-CJK cases are left untouched for the normal parser to handle.
+ * Convert **text** to <strong>text</strong> when at least one side is NOT an
+ * ASCII word character.  CommonMark fails to recognise emphasis boundaries next
+ * to CJK characters and fullwidth punctuation (（）「」 etc.); converting to raw
+ * HTML lets rehype-raw handle it correctly.  Cases where both sides are ASCII
+ * word chars (e.g. a**b**c) are left for the normal parser.
  */
 function fixCjkEmphasis(text: string): string {
-  // Process line by line to avoid breaking code blocks / headings
   return text.split('\n').map(line => {
-    // Skip lines that are code fences, headings-only, or indented code
+    // Skip code fences and indented code blocks
     if (/^(```|~~~|    |\t)/.test(line)) return line;
-    // Replace **text** where inner content has no ** and at least one side is CJK
-    const CJK = '\\u3000-\\u9fff\\uf900-\\ufaff\\u3040-\\u309f\\u30a0-\\u30ff';
-    const re = new RegExp(
-      `(?<=[${CJK}])\\*\\*([^*]+)\\*\\*|\\*\\*([^*]+)\\*\\*(?=[${CJK}])`,
-      'gu',
-    );
-    return line.replace(re, (_, g1, g2) => `<strong>${g1 ?? g2}</strong>`);
+    // Split on inline code spans so we never touch content inside backticks
+    const parts = line.split(/(`[^`]+`)/g);
+    return parts.map((part, i) => {
+      if (i % 2 === 1) return part;           // inline code span — skip
+      return part.replace(
+        /(?<![a-zA-Z0-9_])\*\*([^*]+)\*\*|\*\*([^*]+)\*\*(?![a-zA-Z0-9_])/gu,
+        (_, g1, g2) => `<strong>${g1 ?? g2}</strong>`,
+      );
+    }).join('');
   }).join('\n');
 }
 
