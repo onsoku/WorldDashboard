@@ -63,7 +63,12 @@ export interface ProfileExtension extends BaseExtension {
   links?: { label: string; url: string }[];
 }
 
-export type Extension = MapExtension | TimelineExtension | TableExtension | ChartExtension | ProfileExtension;
+export interface DiagramExtension extends BaseExtension {
+  type: 'diagram';
+  svg: string;
+}
+
+export type Extension = MapExtension | TimelineExtension | TableExtension | ChartExtension | ProfileExtension | DiagramExtension;
 
 export interface ResearchCorrection {
   target: string;

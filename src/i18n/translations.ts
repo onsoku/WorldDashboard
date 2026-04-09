@@ -75,6 +75,10 @@ const translations: Record<Language, Record<string, string>> = {
     'translate.title': '他の言語に翻訳',
     'translate.selectLang': '翻訳先の言語を選択...',
     'translate.start': '翻訳を開始',
+    'delete.button': '削除',
+    'delete.confirm': 'このトピックを削除しますか？この操作は取り消せません。',
+    'repair.button': '修復を試みる',
+    'repair.failed': '自動修復できませんでした。削除して再作成してください。',
   },
   en: {
     'app.title': 'World Dashboard',
@@ -150,6 +154,10 @@ const translations: Record<Language, Record<string, string>> = {
     'translate.title': 'Translate to another language',
     'translate.selectLang': 'Select target language...',
     'translate.start': 'Start Translation',
+    'delete.button': 'Delete',
+    'delete.confirm': 'Delete this topic? This cannot be undone.',
+    'repair.button': 'Attempt repair',
+    'repair.failed': 'Automatic repair failed. Please delete and recreate.',
   },
   zh: {
     'app.title': 'World Dashboard',
@@ -225,6 +233,10 @@ const translations: Record<Language, Record<string, string>> = {
     'translate.title': '翻译为其他语言',
     'translate.selectLang': '选择目标语言...',
     'translate.start': '开始翻译',
+    'delete.button': '删除',
+    'delete.confirm': '确定要删除此主题吗？此操作无法撤销。',
+    'repair.button': '尝试修复',
+    'repair.failed': '自动修复失败，请删除后重新创建。',
   },
   es: {
     'app.title': 'World Dashboard',
@@ -300,6 +312,10 @@ const translations: Record<Language, Record<string, string>> = {
     'translate.title': 'Traducir a otro idioma',
     'translate.selectLang': 'Seleccionar idioma...',
     'translate.start': 'Iniciar traduccion',
+    'delete.button': 'Eliminar',
+    'delete.confirm': 'Eliminar este tema? Esta accion no se puede deshacer.',
+    'repair.button': 'Intentar reparar',
+    'repair.failed': 'La reparacion automatica fallo. Elimine y vuelva a crear.',
   },
   it: {
     'app.title': 'World Dashboard',
@@ -375,6 +391,10 @@ const translations: Record<Language, Record<string, string>> = {
     'translate.title': 'Traduci in un\'altra lingua',
     'translate.selectLang': 'Seleziona lingua...',
     'translate.start': 'Avvia traduzione',
+    'delete.button': 'Elimina',
+    'delete.confirm': 'Eliminare questo argomento? Questa azione non puo essere annullata.',
+    'repair.button': 'Tenta riparazione',
+    'repair.failed': 'Riparazione automatica fallita. Elimina e ricrea.',
   },
   fr: {
     'app.title': 'World Dashboard',
@@ -450,6 +470,10 @@ const translations: Record<Language, Record<string, string>> = {
     'translate.title': 'Traduire dans une autre langue',
     'translate.selectLang': 'Choisir la langue...',
     'translate.start': 'Commencer la traduction',
+    'delete.button': 'Supprimer',
+    'delete.confirm': 'Supprimer ce sujet ? Cette action est irreversible.',
+    'repair.button': 'Tenter la reparation',
+    'repair.failed': 'La reparation automatique a echoue. Supprimez et recreez.',
   },
 };
 

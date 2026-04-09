@@ -51,6 +51,36 @@ export function useResearchData() {
     refreshTopics();
   }, [refreshTopics]);
 
+  const deleteTopic = useCallback(async (slug: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/topic/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+      if (!res.ok) return false;
+      if (selectedSlug === slug) {
+        setSelectedSlug(null);
+        setCurrentData(null);
+        setError(null);
+      }
+      await refreshTopics();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [selectedSlug, refreshTopics]);
+
+  const repairTopic = useCallback(async (slug: string): Promise<'repaired' | 'already_valid' | 'unrepairable' | 'error'> => {
+    try {
+      const res = await fetch(`/api/repair/${encodeURIComponent(slug)}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        await selectTopic(slug);
+        return data.status;
+      }
+      return data.status ?? 'error';
+    } catch {
+      return 'error';
+    }
+  }, [selectTopic]);
+
   useEffect(() => {
     if (topics.length > 0 && !selectedSlug) {
       selectTopic(topics[0].slug);
@@ -65,5 +95,7 @@ export function useResearchData() {
     error,
     refreshTopics,
     selectTopic,
+    deleteTopic,
+    repairTopic,
   };
 }

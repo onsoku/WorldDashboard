@@ -9,6 +9,7 @@ import { MarkdownContent } from '@/components/MarkdownContent';
 import { MapContainer, TileLayer, Marker as LeafletMarker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useMemo } from 'react';
 import type { Extension, ChartSeries } from '@/types/research';
 
 interface ExtensionRendererProps {
@@ -263,6 +264,31 @@ function MapRenderer({ ext }: { ext: Extract<Extension, { type: 'map' }> }) {
   );
 }
 
+function sanitizeSvg(raw: string): string {
+  // Remove script tags, event handlers, and foreign objects
+  let svg = raw
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
+    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/javascript\s*:/gi, '');
+  // Ensure it's wrapped in an <svg> tag
+  if (!svg.trim().startsWith('<svg')) {
+    svg = `<svg xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+  }
+  return svg;
+}
+
+function DiagramRenderer({ ext }: { ext: Extract<Extension, { type: 'diagram' }> }) {
+  const sanitized = useMemo(() => sanitizeSvg(ext.svg), [ext.svg]);
+  return (
+    <div
+      className="overflow-x-auto flex justify-center"
+      dangerouslySetInnerHTML={{ __html: sanitized }}
+      style={{ maxWidth: '100%' }}
+    />
+  );
+}
+
 export function ExtensionRenderer({ extensions }: ExtensionRendererProps) {
 
   return (
@@ -279,7 +305,8 @@ export function ExtensionRenderer({ extensions }: ExtensionRendererProps) {
           {ext.type === 'chart' && <ChartRenderer ext={ext} />}
           {ext.type === 'timeline' && <TimelineRenderer ext={ext} />}
           {ext.type === 'map' && <MapRenderer ext={ext} />}
-          {ext.type !== 'table' && ext.type !== 'chart' && ext.type !== 'timeline' && ext.type !== 'map' && (
+          {ext.type === 'diagram' && <DiagramRenderer ext={ext} />}
+          {ext.type !== 'table' && ext.type !== 'chart' && ext.type !== 'timeline' && ext.type !== 'map' && ext.type !== 'diagram' && (
             <pre className="text-xs theme-text-secondary overflow-x-auto p-3 rounded-md"
               style={{ backgroundColor: 'var(--color-bg-active)' }}>
               {JSON.stringify(ext, null, 2)}

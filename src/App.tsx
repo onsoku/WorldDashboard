@@ -10,7 +10,7 @@ import { TranslateDialog } from '@/components/TranslateDialog';
 import { useResearchData } from '@/hooks/useResearchData';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsProvider, useSettings } from '@/context/SettingsContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Wrench, Trash2 } from 'lucide-react';
 import { useState, useCallback, useMemo } from 'react';
 import type { ResearchData } from '@/types/research';
 
@@ -35,7 +35,7 @@ function detectContentLang(data: ResearchData): string | undefined {
 }
 
 function Dashboard() {
-  const { topics, selectedSlug, currentData, isLoading, error, refreshTopics, selectTopic } = useResearchData();
+  const { topics, selectedSlug, currentData, isLoading, error, refreshTopics, selectTopic, deleteTopic, repairTopic } = useResearchData();
   const { t } = useTranslation();
   const { settings } = useSettings();
   const [drilldownRequest, setDrilldownRequest] = useState<{ topic: string; parentSlug: string } | null>(null);
@@ -103,6 +103,7 @@ function Dashboard() {
       drilldownRequest={drilldownRequest}
       onDrilldownConsumed={() => setDrilldownRequest(null)}
       onImport={handleImport}
+      onDelete={deleteTopic}
       updateRequest={updateRequest}
       onUpdateConsumed={() => setUpdateRequest(null)}
       translateRequest={translateRequest}
@@ -132,7 +133,35 @@ function Dashboard() {
 
       {error && (
         <div className="rounded-lg p-4 text-sm" style={{ backgroundColor: 'var(--color-error-light)', color: 'var(--color-error)' }}>
-          {error}
+          <p>{error}</p>
+          {error.includes('JSONパースエラー') && selectedSlug && (
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={async () => {
+                  const result = await repairTopic(selectedSlug);
+                  if (result === 'repaired' || result === 'already_valid') {
+                    // selectTopic is called inside repairTopic
+                  } else {
+                    alert(t('repair.failed'));
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md text-white transition-colors"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                <Wrench className="w-3.5 h-3.5" /> {t('repair.button')}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirm(t('delete.confirm'))) return;
+                  await deleteTopic(selectedSlug);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors"
+                style={{ backgroundColor: 'var(--color-error)', color: 'white' }}
+              >
+                <Trash2 className="w-3.5 h-3.5" /> {t('delete.button')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

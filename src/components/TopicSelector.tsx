@@ -1,4 +1,4 @@
-import { RefreshCw, Search, Plus, Upload } from 'lucide-react';
+import { RefreshCw, Search, Plus, Upload, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { TopicEntry } from '@/types/research';
 import { useTranslation } from '@/i18n/useTranslation';
@@ -13,6 +13,7 @@ interface TopicSelectorProps {
   drilldownRequest?: { topic: string; parentSlug: string } | null;
   onDrilldownConsumed?: () => void;
   onImport?: (file: File) => void;
+  onDelete?: (slug: string) => Promise<boolean>;
   updateRequest?: { topic: string; slug: string } | null;
   onUpdateConsumed?: () => void;
   translateRequest?: { sourceSlug: string; targetLang: string } | null;
@@ -25,7 +26,7 @@ interface ActiveJob {
   startedAt: string;
 }
 
-export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport, updateRequest, onUpdateConsumed, translateRequest, onTranslateConsumed }: TopicSelectorProps) {
+export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport, onDelete, updateRequest, onUpdateConsumed, translateRequest, onTranslateConsumed }: TopicSelectorProps) {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const [filter, setFilter] = useState('');
@@ -177,7 +178,7 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
         ) : (
           <ul className="py-1">
             {filtered.map(tp => (
-              <li key={tp.slug}>
+              <li key={tp.slug} className="group relative">
                 <button onClick={() => onSelect(tp.slug)}
                   className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                     tp.slug === selectedSlug
@@ -185,11 +186,24 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
                       : 'theme-text-secondary hover:theme-bg-hover'
                   }`}
                   style={tp.slug === selectedSlug ? { color: 'var(--color-primary-text)', borderColor: 'var(--color-border-active)' } : undefined}>
-                  <div className="font-medium truncate">{tp.topic}</div>
+                  <div className="font-medium truncate pr-6">{tp.topic}</div>
                   <div className="text-xs theme-text-muted mt-0.5">
                     {new Date(tp.createdAt).toLocaleDateString()}
                   </div>
                 </button>
+                {onDelete && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(t('delete.confirm'))) return;
+                      await onDelete(tp.slug);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:theme-bg-active"
+                    title={t('delete.button')}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 theme-text-muted" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>

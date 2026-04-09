@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite'
 import { spawn } from 'child_process'
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs'
 import path from 'path'
 
 interface LogEntry {
@@ -16,6 +16,7 @@ interface ResearchJob {
   message?: string;
   logs: LogEntry[];
   lang: string;
+  writtenFiles: string[];
 }
 
 const LOG_MESSAGES: Record<string, Record<string, string>> = {
@@ -124,7 +125,7 @@ function addLog(job: ResearchJob, phase: LogEntry['phase'], message: string) {
  * Validate a JSON file written by Claude CLI and attempt to repair common issues.
  * Returns true if the file is valid (or was successfully repaired).
  */
-function validateAndRepairJson(filePath: string): { valid: boolean; error?: string } {
+function validateAndRepairJson(filePath: string): { valid: boolean; repaired?: boolean; error?: string } {
   if (!existsSync(filePath)) return { valid: false, error: 'File not found' };
   const raw = readFileSync(filePath, 'utf-8');
   try {
@@ -132,7 +133,6 @@ function validateAndRepairJson(filePath: string): { valid: boolean; error?: stri
     return { valid: true };
   } catch (e) {
     const errMsg = e instanceof SyntaxError ? e.message : String(e);
-    console.warn(`[research-api] Invalid JSON in ${filePath}: ${errMsg}`);
     // Attempt repair: fix common issues from LLM-generated JSON
     try {
       let fixed = raw;
@@ -142,9 +142,10 @@ function validateAndRepairJson(filePath: string): { valid: boolean; error?: stri
       fixed = fixed.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
       JSON.parse(fixed);
       writeFileSync(filePath, fixed, 'utf-8');
-      console.log(`[research-api] Repaired JSON: ${filePath}`);
-      return { valid: true };
+      console.log(`[research-api] Auto-repaired JSON: ${filePath}`);
+      return { valid: true, repaired: true };
     } catch {
+      console.warn(`[research-api] Invalid JSON in ${filePath}: ${errMsg}`);
       return { valid: false, error: errMsg };
     }
   }
@@ -177,6 +178,7 @@ function parseStreamLine(line: string, job: ResearchJob) {
               addLog(job, 'writing', msg(L, 'index-write'));
             } else if (filePath.includes('.json')) {
               addLog(job, 'writing', msg(L, 'data-write'));
+              job.writtenFiles.push(filePath);
             }
           } else if (toolName === 'Read') {
             const filePath: string = input.file_path ?? '';
@@ -276,6 +278,124 @@ export function researchApiPlugin(): Plugin {
         });
       });
 
+      // Delete topic API endpoint
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? '';
+        const deleteMatch = url.match(/^\/api\/topic\/([^/?]+)$/);
+        if (!deleteMatch || req.method !== 'DELETE') return next();
+
+        res.setHeader('Content-Type', 'application/json');
+        const slug = decodeURIComponent(deleteMatch[1]);
+        const projectRoot = process.cwd();
+        const dataDir = path.join(projectRoot, 'public', 'data');
+        const filePath = path.join(dataDir, `${slug}.json`);
+
+        // Validate slug to prevent path traversal
+        if (slug.includes('..') || slug.includes('/') || slug.includes('\\')) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'Invalid slug' }));
+          return;
+        }
+
+        try {
+          // Remove the JSON file
+          if (existsSync(filePath)) {
+            unlinkSync(filePath);
+          }
+
+          // Remove from index.json
+          const indexPath = path.join(dataDir, 'index.json');
+          if (existsSync(indexPath)) {
+            const index = JSON.parse(readFileSync(indexPath, 'utf-8'));
+            index.topics = (index.topics ?? []).filter((t: { slug: string }) => t.slug !== slug);
+            writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf-8');
+          }
+
+          res.statusCode = 200;
+          res.end(JSON.stringify({ slug, status: 'deleted' }));
+        } catch (e) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: `Delete failed: ${e instanceof Error ? e.message : String(e)}` }));
+        }
+      });
+
+      // Repair topic API endpoint
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? '';
+        const repairMatch = url.match(/^\/api\/repair\/([^/?]+)$/);
+        if (!repairMatch || req.method !== 'POST') return next();
+
+        res.setHeader('Content-Type', 'application/json');
+        const slug = decodeURIComponent(repairMatch[1]);
+        const projectRoot = process.cwd();
+        const dataDir = path.join(projectRoot, 'public', 'data');
+        const filePath = path.join(dataDir, `${slug}.json`);
+
+        if (slug.includes('..') || slug.includes('/') || slug.includes('\\')) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: 'Invalid slug' }));
+          return;
+        }
+
+        if (!existsSync(filePath)) {
+          res.statusCode = 404;
+          res.end(JSON.stringify({ error: 'File not found' }));
+          return;
+        }
+
+        const raw = readFileSync(filePath, 'utf-8');
+
+        // First check if it's already valid
+        try {
+          JSON.parse(raw);
+          res.statusCode = 200;
+          res.end(JSON.stringify({ slug, status: 'already_valid' }));
+          return;
+        } catch { /* needs repair */ }
+
+        // Attempt repair with multiple strategies
+        let fixed = raw;
+        try {
+          // Strategy 1: Remove trailing commas
+          fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+          // Strategy 2: Remove control characters
+          fixed = fixed.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+          // Strategy 3: Fix unescaped newlines in strings
+          fixed = fixed.replace(/(?<=:\s*"[^"]*)\n(?=[^"]*")/g, '\\n');
+          // Strategy 4: Truncate at last valid closing brace if JSON is truncated
+          try {
+            JSON.parse(fixed);
+          } catch (e2) {
+            if (e2 instanceof SyntaxError && e2.message.includes('end of JSON input')) {
+              // JSON is truncated — find the last complete object
+              const lastBrace = fixed.lastIndexOf('}');
+              if (lastBrace > 0) {
+                // Try progressively truncating to find valid JSON
+                for (let i = lastBrace; i >= 0; i--) {
+                  if (fixed[i] === '}') {
+                    const candidate = fixed.slice(0, i + 1);
+                    try {
+                      JSON.parse(candidate);
+                      fixed = candidate;
+                      break;
+                    } catch { /* try next */ }
+                  }
+                }
+              }
+            }
+          }
+
+          JSON.parse(fixed);
+          writeFileSync(filePath, fixed, 'utf-8');
+          console.log(`[research-api] Repaired JSON: ${filePath}`);
+          res.statusCode = 200;
+          res.end(JSON.stringify({ slug, status: 'repaired' }));
+        } catch {
+          res.statusCode = 422;
+          res.end(JSON.stringify({ slug, status: 'unrepairable', error: 'Automatic repair failed. Consider deleting this topic.' }));
+        }
+      });
+
       // Translate API endpoint
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? '';
@@ -331,6 +451,7 @@ export function researchApiPlugin(): Plugin {
               startedAt: new Date().toISOString(),
               logs: [],
               lang: targetLang,
+              writtenFiles: [],
             };
             jobs.set(jobId, job);
             addLog(job, 'start', `${msg(targetLang, 'start')}: ${sourceTopic} → ${targetLangName}`);
@@ -441,12 +562,16 @@ export function researchApiPlugin(): Plugin {
                   addLog(job, 'error', job.message);
                 }
               }
-              // Validate written JSON file after translation completes
-              if (job.status === 'completed') {
-                const fp = path.join(dataDir, `${newSlug}.json`);
-                const { valid, error: jsonErr } = validateAndRepairJson(fp);
-                if (!valid) {
-                  addLog(job, 'error', `JSONバリデーションエラー (${newSlug}.json): ${jsonErr}`);
+              // Validate written JSON files after translation completes
+              if (job.status === 'completed' && job.writtenFiles.length > 0) {
+                for (const fp of job.writtenFiles) {
+                  const { valid, repaired, error: jsonErr } = validateAndRepairJson(fp);
+                  const filename = path.basename(fp);
+                  if (repaired) {
+                    addLog(job, 'writing', `JSON自動修復: ${filename}`);
+                  } else if (!valid) {
+                    addLog(job, 'error', `JSONバリデーションエラー (${filename}): ${jsonErr}`);
+                  }
                 }
               }
             });
@@ -485,13 +610,18 @@ export function researchApiPlugin(): Plugin {
             res.end(JSON.stringify({ error: 'Job not found' }));
             return;
           }
-          res.end(JSON.stringify({ jobId, ...job }));
+          const { writtenFiles: _, ...jobData } = job;
+          res.end(JSON.stringify({ jobId, ...jobData }));
           return;
         }
 
         // GET /api/research — list all jobs
         if (req.method === 'GET' && url.match(/^\/api\/research\/?(\?.*)?$/)) {
-          const all = Object.fromEntries(jobs);
+          const all: Record<string, Omit<ResearchJob, 'writtenFiles'>> = {};
+          for (const [id, j] of jobs) {
+            const { writtenFiles: _, ...jData } = j;
+            all[id] = jData;
+          }
           res.end(JSON.stringify({ jobs: all }));
           return;
         }
@@ -526,6 +656,7 @@ export function researchApiPlugin(): Plugin {
                 startedAt: new Date().toISOString(),
                 logs: [],
                 lang,
+                writtenFiles: [],
               };
               jobs.set(jobId, job);
 
@@ -683,21 +814,15 @@ export function researchApiPlugin(): Plugin {
                     addLog(job, 'error', job.message);
                   }
                 }
-                // Validate written JSON files after job completes
-                if (job.status === 'completed') {
-                  const slug = isUpdate ? existingSlug : undefined;
-                  // Find the most recently written JSON file from logs
-                  const writeLog = job.logs.filter(l => l.message.includes(msg(lang, 'data-write')));
-                  if (writeLog.length > 0) {
-                    // Glob for JSON files matching the topic
-                    const files = require('fs').readdirSync(dataDir);
-                    for (const f of files) {
-                      if (!f.endsWith('.json') || f === 'index.json') continue;
-                      const fp = path.join(dataDir, f);
-                      const { valid, error: jsonErr } = validateAndRepairJson(fp);
-                      if (!valid) {
-                        addLog(job, 'error', `JSONバリデーションエラー (${f}): ${jsonErr}`);
-                      }
+                // Validate only the JSON files written by this job
+                if (job.status === 'completed' && job.writtenFiles.length > 0) {
+                  for (const fp of job.writtenFiles) {
+                    const { valid, repaired, error: jsonErr } = validateAndRepairJson(fp);
+                    const filename = path.basename(fp);
+                    if (repaired) {
+                      addLog(job, 'writing', `JSON自動修復: ${filename}`);
+                    } else if (!valid) {
+                      addLog(job, 'error', `JSONバリデーションエラー (${filename}): ${jsonErr}`);
                     }
                   }
                 }
