@@ -11,7 +11,7 @@ interface ActiveJob {
 
 interface JobQueueProps {
   jobs: ActiveJob[];
-  onJobComplete: (jobId: string) => void;
+  onJobComplete: (jobId: string, slug?: string) => void;
   onJobError: (jobId: string, message: string) => void;
   onDismiss: (jobId: string) => void;
 }
@@ -57,7 +57,7 @@ export function JobQueue({ jobs, onJobComplete, onJobError, onDismiss }: JobQueu
                 jobId={job.jobId}
                 topic={job.topic}
                 startedAt={job.startedAt}
-                onComplete={() => onJobComplete(job.jobId)}
+                onComplete={(slug) => onJobComplete(job.jobId, slug)}
                 onError={(msg) => onJobError(job.jobId, msg)}
               />
             </div>

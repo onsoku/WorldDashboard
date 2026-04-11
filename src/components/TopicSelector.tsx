@@ -41,10 +41,13 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
     tp.topic.toLowerCase().includes(filter.toLowerCase())
   );
 
-  const handleJobComplete = useCallback((jobId: string) => {
+  const handleJobComplete = useCallback(async (jobId: string, slug?: string) => {
     setActiveJobs(prev => prev.filter(j => j.jobId !== jobId));
-    onRefresh();
-  }, [onRefresh]);
+    await onRefresh();
+    if (slug) {
+      onSelect(slug);
+    }
+  }, [onRefresh, onSelect]);
 
   const handleJobError = useCallback((_jobId: string, _message: string) => { }, []);
 

@@ -610,8 +610,11 @@ export function researchApiPlugin(): Plugin {
             res.end(JSON.stringify({ error: 'Job not found' }));
             return;
           }
-          const { writtenFiles: _, ...jobData } = job;
-          res.end(JSON.stringify({ jobId, ...jobData }));
+          const { writtenFiles, ...jobData } = job;
+          // Derive slug from the last written data file (excluding index.json)
+          const dataFiles = writtenFiles.filter(f => !f.includes('index.json') && f.endsWith('.json'));
+          const lastFile = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
+          res.end(JSON.stringify({ jobId, ...jobData, slug: lastFile }));
           return;
         }
 

@@ -12,7 +12,7 @@ interface ResearchProgressProps {
   jobId: string;
   topic: string;
   startedAt: string;
-  onComplete: () => void;
+  onComplete: (slug?: string) => void;
   onError: (message: string) => void;
 }
 
@@ -41,7 +41,7 @@ export function ResearchProgress({ jobId, topic, startedAt, onComplete, onError 
         const data = await res.json();
         setLogs(data.logs ?? []);
         setStatus(data.status);
-        if (data.status === 'completed') { clearInterval(interval); onComplete(); }
+        if (data.status === 'completed') { clearInterval(interval); onComplete(data.slug); }
         else if (data.status === 'error') { clearInterval(interval); onError(data.message ?? ''); }
       } catch { /* retry */ }
     }, 2000);
