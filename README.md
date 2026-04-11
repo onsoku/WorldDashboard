@@ -18,6 +18,9 @@
 ### Keyword Map & Sources
 ![Keywords](./docs/screenshots/light-keywords.png)
 
+### Extensions (SVG Diagram, Charts)
+![Extensions](./docs/screenshots/light-extensions.png)
+
 ### English UI
 ![English](./docs/screenshots/light-english.png)
 
@@ -33,21 +36,22 @@
 - **Growing Knowledge Base** — Topics saved locally and revisitable anytime
 - **Drilldown Navigation** — Click any keyword in the treemap, key finding in overview, or "next paper" suggestion to instantly start a new research on that topic (parent-child tracking via `meta.parentSlug`)
 - **Import/Export** — Export button (↓) in header downloads current topic as JSON; import button (↑) in sidebar or drag & drop JSON files onto the topic list
-- **Flexible Schema** — Only `meta.topic` and `meta.slug` are required; all other fields optional. Extensions system for theme-specific data (map, timeline, table, chart, profile)
-- **Rich Display** — Markdown rendering (tables, bold, headings, lists) in overview and paper summaries. Extension renderers for table, chart (bar/line/pie via Recharts), and timeline
+- **Flexible Schema** — Only `meta.topic` and `meta.slug` are required; all other fields optional. Extensions system for theme-specific data (map, timeline, table, chart, profile, diagram)
+- **Rich Display** — Markdown rendering (tables, bold, headings, lists) in overview and paper summaries. Extension renderers for table, chart (bar/line/pie via Recharts), timeline, and SVG diagrams
+- **SVG Diagrams** — System architecture and concept diagrams rendered as sanitized SVG with theme-aware backgrounds
 - **Version-managed Updates** — Update existing topics with new information while preserving version history. Previous versions are kept intact and browsable. Corrections are tracked when facts change
 - **Culture-aware Translation** — Translate topics to any of 6 supported languages with automatic cultural difference assessment. Goes beyond word-for-word translation with supplementary web search when cultural context differs
 - **Extended Charts & Maps** — 7 chart types (bar, line, pie, area, radar, scatter, stacked bar) with multi-series support. Interactive maps via Leaflet/OpenStreetMap with markers and popups
 - **Structured Knowledge Pages** — Each topic is planned with a theme-specific structure covering understanding, context, and next steps, guided by the encyclopedia's design principles
 - **Parallel Job Execution** — Queue up to 3 research/translation jobs simultaneously with real-time progress tracking for each
 - **IME Support** — Full CJK input method support in topic input fields, preventing accidental submission during kanji/hanzi conversion
-- **JSON Validation & Repair** — Automatic validation and repair of generated JSON data files to prevent parse errors
+- **JSON Validation & Repair** — Automatic validation and repair of generated JSON data files to prevent parse errors. Broken entries can be repaired or deleted from the UI
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18 + TypeScript + Vite 6 |
+| Frontend | React 19 + TypeScript + Vite 6 |
 | Styling | Tailwind CSS 4 |
 | Markdown | react-markdown + remark-gfm |
 | Charts | Recharts |
