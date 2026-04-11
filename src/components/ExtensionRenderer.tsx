@@ -282,9 +282,9 @@ function DiagramRenderer({ ext }: { ext: Extract<Extension, { type: 'diagram' }>
   const sanitized = useMemo(() => sanitizeSvg(ext.svg), [ext.svg]);
   return (
     <div
-      className="overflow-x-auto flex justify-center"
+      className="overflow-x-auto flex justify-center rounded-lg p-4"
       dangerouslySetInnerHTML={{ __html: sanitized }}
-      style={{ maxWidth: '100%' }}
+      style={{ maxWidth: '100%', backgroundColor: '#E2D8C3' }}
     />
   );
 }
