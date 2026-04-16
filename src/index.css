@@ -255,3 +255,43 @@
 .map-marker:hover {
   r: 7;
 }
+
+/* ===== Print View ===== */
+
+.print-root {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.print-topic {
+  padding-bottom: 24px;
+}
+.print-topic-header {
+  border-bottom: 2px solid var(--color-border);
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+}
+.print-topic-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.print-topic-meta {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+@media print {
+  .print-root {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  .print-topic {
+    page-break-after: always;
+  }
+  .print-topic:last-child {
+    page-break-after: auto;
+  }
+}

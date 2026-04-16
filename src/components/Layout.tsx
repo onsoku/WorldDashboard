@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BookOpen, Download, RefreshCw, Languages } from 'lucide-react';
+import { BookOpen, Download, RefreshCw, Languages, FileDown } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsPanel } from './SettingsPanel';
 import { APP_VERSION } from '@/version';
@@ -9,11 +9,12 @@ interface LayoutProps {
   children: ReactNode;
   topicName?: string;
   onExport?: () => void;
+  onExportPdf?: () => void;
   onUpdate?: () => void;
   onTranslate?: () => void;
 }
 
-export function Layout({ sidebar, children, topicName, onExport, onUpdate, onTranslate }: LayoutProps) {
+export function Layout({ sidebar, children, topicName, onExport, onExportPdf, onUpdate, onTranslate }: LayoutProps) {
   const { t } = useTranslation();
 
   return (
@@ -52,6 +53,12 @@ export function Layout({ sidebar, children, topicName, onExport, onUpdate, onTra
                 <button onClick={onExport} title={t('export.button')}
                   className="p-1.5 rounded-md theme-text-secondary hover:theme-bg-hover transition-colors">
                   <Download className="w-4 h-4" />
+                </button>
+              )}
+              {onExportPdf && (
+                <button onClick={onExportPdf} title={t('pdfExport.button')}
+                  className="p-1.5 rounded-md theme-text-secondary hover:theme-bg-hover transition-colors">
+                  <FileDown className="w-4 h-4" />
                 </button>
               )}
               <SettingsPanel />

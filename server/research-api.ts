@@ -396,6 +396,96 @@ export function researchApiPlugin(): Plugin {
         }
       });
 
+      // Export PDF API endpoint — bundles one or more topics into a single PDF.
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? '';
+        if (url !== '/api/export-pdf' || req.method !== 'POST') return next();
+
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        req.on('end', async () => {
+          let slugs: string[] = [];
+          try {
+            const parsed = JSON.parse(body);
+            slugs = Array.isArray(parsed?.slugs) ? parsed.slugs : [];
+          } catch {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+            return;
+          }
+          if (slugs.length === 0) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'At least one slug required' }));
+            return;
+          }
+          // Validate slugs — reject anything path-traversal-y or with separators.
+          const projectRoot = process.cwd();
+          const dataDir = path.join(projectRoot, 'public', 'data');
+          for (const s of slugs) {
+            if (typeof s !== 'string' || s.includes('..') || s.includes('/') || s.includes('\\')) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `Invalid slug: ${s}` }));
+              return;
+            }
+            if (!existsSync(path.join(dataDir, `${s}.json`))) {
+              res.statusCode = 404;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: `Unknown slug: ${s}` }));
+              return;
+            }
+          }
+
+          // Resolve port from the vite http server.
+          const httpServer = server.httpServer;
+          const address = httpServer?.address();
+          const port = address && typeof address === 'object' ? address.port : null;
+          if (!port) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Dev server port unavailable' }));
+            return;
+          }
+
+          try {
+            const puppeteer = (await import('puppeteer')).default;
+            const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+            try {
+              const page = await browser.newPage();
+              await page.setViewport({ width: 1024, height: 1400 });
+              const printUrl = `http://localhost:${port}/print?slugs=${encodeURIComponent(slugs.join(','))}`;
+              await page.goto(printUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+              await page.waitForFunction(
+                'window.__PRINT_READY__ === true',
+                { timeout: 30000 },
+              );
+              const pdfBuffer = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                margin: { top: '12mm', bottom: '12mm', left: '12mm', right: '12mm' },
+              });
+
+              const firstSlug = slugs[0];
+              const filename = slugs.length === 1 ? `${firstSlug}.pdf` : `encyclopedia-${slugs.length}-topics.pdf`;
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/pdf');
+              res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+              res.setHeader('Content-Length', String(pdfBuffer.length));
+              res.end(pdfBuffer);
+            } finally {
+              await browser.close();
+            }
+          } catch (e) {
+            console.error('[research-api] PDF export failed:', e);
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: `PDF export failed: ${e instanceof Error ? e.message : String(e)}` }));
+          }
+        });
+      });
+
       // Translate API endpoint
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? '';

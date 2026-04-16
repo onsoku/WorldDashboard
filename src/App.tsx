@@ -7,6 +7,7 @@ import { SourceList } from '@/components/SourceList';
 import { ExtensionRenderer } from '@/components/ExtensionRenderer';
 import { VersionHistory } from '@/components/VersionHistory';
 import { TranslateDialog } from '@/components/TranslateDialog';
+import { PdfExportDialog } from '@/components/PdfExportDialog';
 import { useResearchData } from '@/hooks/useResearchData';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsProvider, useSettings } from '@/context/SettingsContext';
@@ -83,6 +84,7 @@ function Dashboard() {
   const [updateRequest, setUpdateRequest] = useState<{ topic: string; slug: string } | null>(null);
   const [translateRequest, setTranslateRequest] = useState<{ sourceSlug: string; targetLang: string } | null>(null);
   const [showTranslateDialog, setShowTranslateDialog] = useState(false);
+  const [showPdfDialog, setShowPdfDialog] = useState(false);
 
   const handleUpdate = useCallback(() => {
     if (!currentData) return;
@@ -124,7 +126,7 @@ function Dashboard() {
   const currentVersionNum = (currentData?.versions?.length ?? 0) + 1;
 
   return (
-    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined} onUpdate={currentData ? handleUpdate : undefined} onTranslate={currentData ? () => setShowTranslateDialog(true) : undefined}>
+    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined} onExportPdf={currentData ? () => setShowPdfDialog(true) : undefined} onUpdate={currentData ? handleUpdate : undefined} onTranslate={currentData ? () => setShowTranslateDialog(true) : undefined}>
       {isLoading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
@@ -212,6 +214,13 @@ function Dashboard() {
           contentLang={currentData.meta.sourceLang ?? currentData.meta.lang ?? detectContentLang(currentData) ?? settings.language}
           onTranslate={handleTranslate}
           onClose={() => setShowTranslateDialog(false)}
+        />
+      )}
+      {showPdfDialog && (
+        <PdfExportDialog
+          topics={topics}
+          initialSlug={selectedSlug}
+          onClose={() => setShowPdfDialog(false)}
         />
       )}
     </Layout>
