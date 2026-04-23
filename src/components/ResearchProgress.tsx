@@ -1,19 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Loader2, CheckCircle, Globe, BookOpen, Brain, FileOutput, AlertCircle, Rocket } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
-
-interface LogEntry {
-  timestamp: string;
-  message: string;
-  phase: 'start' | 'web-search' | 'paper-search' | 'synthesis' | 'writing' | 'done' | 'error';
-}
+import type { LogEntry } from '@/hooks/useJobs';
 
 interface ResearchProgressProps {
-  jobId: string;
-  topic: string;
+  status: 'running' | 'completed' | 'error';
+  logs: LogEntry[];
   startedAt: string;
-  onComplete: (slug?: string) => void;
-  onError: (message: string) => void;
+  completedAt?: string;
+  message?: string;
 }
 
 const PHASE_ICON: Record<string, typeof Globe> = {
@@ -21,33 +16,19 @@ const PHASE_ICON: Record<string, typeof Globe> = {
   synthesis: Brain, writing: FileOutput, done: CheckCircle, error: AlertCircle,
 };
 
-export function ResearchProgress({ jobId, topic, startedAt, onComplete, onError }: ResearchProgressProps) {
+export function ResearchProgress({ status, logs, startedAt, completedAt, message }: ResearchProgressProps) {
   const { t } = useTranslation();
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [status, setStatus] = useState<'running' | 'completed' | 'error'>('running');
-  const [elapsed, setElapsed] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const start = new Date(startedAt).getTime();
-    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    if (status !== 'running') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [startedAt]);
+  }, [status]);
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/research/${jobId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setLogs(data.logs ?? []);
-        setStatus(data.status);
-        if (data.status === 'completed') { clearInterval(interval); onComplete(data.slug); }
-        else if (data.status === 'error') { clearInterval(interval); onError(data.message ?? ''); }
-      } catch { /* retry */ }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [jobId, onComplete, onError]);
-
+  const start = new Date(startedAt).getTime();
+  const end = status === 'running' ? now : (completedAt ? new Date(completedAt).getTime() : now);
+  const elapsed = Math.max(0, Math.floor((end - start) / 1000));
   const m = Math.floor(elapsed / 60);
   const s = elapsed % 60;
   const timeStr = m > 0 ? `${m}m${s}s` : `${s}s`;
@@ -76,7 +57,7 @@ export function ResearchProgress({ jobId, topic, startedAt, onComplete, onError 
                   : log.phase === 'error' ? <AlertCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
                   : <Icon className="w-3.5 h-3.5 theme-text-muted" />}
               </div>
-              <span className={`text-xs leading-relaxed ${
+              <span className={`text-xs leading-relaxed break-all ${
                 log.phase === 'error' ? '' : log.phase === 'done' ? 'font-medium' : isLatest ? 'theme-text' : 'theme-text-muted'
               }`} style={log.phase === 'error' ? { color: 'var(--color-error)' } : log.phase === 'done' ? { color: 'var(--color-success)' } : undefined}>
                 {log.message}
@@ -85,6 +66,12 @@ export function ResearchProgress({ jobId, topic, startedAt, onComplete, onError 
           );
         })}
       </div>
+
+      {status === 'error' && message && (
+        <div className="text-xs rounded-md p-2 break-all" style={{ backgroundColor: 'var(--color-error-light)', color: 'var(--color-error)' }}>
+          <strong>{t('progress.error')}:</strong> {message}
+        </div>
+      )}
 
       {status === 'running' && (
         <div className="w-full rounded-full h-1 overflow-hidden theme-bg-progress">

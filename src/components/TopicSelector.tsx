@@ -4,6 +4,7 @@ import type { TopicEntry } from '@/types/research';
 import { useTranslation } from '@/i18n/useTranslation';
 import { useSettings } from '@/context/SettingsContext';
 import { JobQueue } from './JobQueue';
+import type { JobRecord } from '@/hooks/useJobs';
 
 interface TopicSelectorProps {
   topics: TopicEntry[];
@@ -18,21 +19,15 @@ interface TopicSelectorProps {
   onUpdateConsumed?: () => void;
   translateRequest?: { sourceSlug: string; targetLang: string } | null;
   onTranslateConsumed?: () => void;
+  runningJobs: JobRecord[];
 }
 
-interface ActiveJob {
-  jobId: string;
-  topic: string;
-  startedAt: string;
-}
-
-export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport, onDelete, updateRequest, onUpdateConsumed, translateRequest, onTranslateConsumed }: TopicSelectorProps) {
+export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drilldownRequest, onDrilldownConsumed, onImport, onDelete, updateRequest, onUpdateConsumed, translateRequest, onTranslateConsumed, runningJobs }: TopicSelectorProps) {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const [filter, setFilter] = useState('');
   const [newTopic, setNewTopic] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
-  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composingRef = useRef(false);
@@ -40,20 +35,6 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
   const filtered = topics.filter(tp =>
     tp.topic.toLowerCase().includes(filter.toLowerCase())
   );
-
-  const handleJobComplete = useCallback(async (jobId: string, slug?: string) => {
-    setActiveJobs(prev => prev.filter(j => j.jobId !== jobId));
-    await onRefresh();
-    if (slug) {
-      onSelect(slug);
-    }
-  }, [onRefresh, onSelect]);
-
-  const handleJobError = useCallback((_jobId: string, _message: string) => { }, []);
-
-  const handleJobDismiss = useCallback((jobId: string) => {
-    setActiveJobs(prev => prev.filter(j => j.jobId !== jobId));
-  }, []);
 
   const startResearch = useCallback(async (topic: string, opts?: { parentSlug?: string; mode?: string; slug?: string }) => {
     if (!topic.trim()) return;
@@ -71,7 +52,6 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? 'Failed'); return; }
-      setActiveJobs(prev => [...prev, { jobId: data.jobId, topic: topic.trim(), startedAt: new Date().toISOString() }]);
       setNewTopic('');
     } catch { alert('Connection failed'); }
   }, [settings.language]);
@@ -101,7 +81,6 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error ?? 'Failed'); return; }
-      setActiveJobs(prev => [...prev, { jobId: data.jobId, topic: data.topic, startedAt: new Date().toISOString() }]);
     } catch { alert('Connection failed'); }
   }, []);
 
@@ -150,12 +129,7 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
           </div>
         )}
 
-        <JobQueue
-          jobs={activeJobs}
-          onJobComplete={handleJobComplete}
-          onJobError={handleJobError}
-          onDismiss={handleJobDismiss}
-        />
+        <JobQueue jobs={runningJobs} />
 
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 theme-text-muted" />

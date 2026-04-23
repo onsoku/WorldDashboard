@@ -13,10 +13,12 @@ interface ResearchJob {
   topic: string;
   status: 'running' | 'completed' | 'error';
   startedAt: string;
+  completedAt?: string;
   message?: string;
   logs: LogEntry[];
   lang: string;
   writtenFiles: string[];
+  mode?: 'research' | 'translate' | 'update';
 }
 
 const LOG_MESSAGES: Record<string, Record<string, string>> = {
@@ -151,6 +153,20 @@ function validateAndRepairJson(filePath: string): { valid: boolean; repaired?: b
   }
 }
 
+function markDone(job: ResearchJob) {
+  if (!job.completedAt) job.completedAt = new Date().toISOString();
+}
+
+function pruneOldJobs() {
+  // Keep completed/error jobs for 24h to allow history review.
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  for (const [id, j] of jobs) {
+    if (j.status !== 'running' && j.completedAt && new Date(j.completedAt).getTime() < cutoff) {
+      jobs.delete(id);
+    }
+  }
+}
+
 function parseStreamLine(line: string, job: ResearchJob) {
   const L = job.lang;
   try {
@@ -210,14 +226,17 @@ function parseStreamLine(line: string, job: ResearchJob) {
         job.status = 'completed';
         job.message = `${msg(L, 'complete')}: ${job.topic}`;
         addLog(job, 'done', msg(L, 'done'));
+        markDone(job);
       } else if (event.subtype === 'error_max_turns') {
         job.status = 'completed';
         job.message = `${msg(L, 'complete')}: ${job.topic}`;
         addLog(job, 'done', msg(L, 'done-max'));
+        markDone(job);
       } else {
         job.status = 'error';
         job.message = (event.result as string | undefined)?.slice(0, 500) ?? `Error: ${event.subtype ?? 'unknown'}`;
         addLog(job, 'error', job.message);
+        markDone(job);
       }
     }
   } catch {
@@ -542,6 +561,7 @@ export function researchApiPlugin(): Plugin {
               logs: [],
               lang: targetLang,
               writtenFiles: [],
+              mode: 'translate',
             };
             jobs.set(jobId, job);
             addLog(job, 'start', `${msg(targetLang, 'start')}: ${sourceTopic} → ${targetLangName}`);
@@ -664,12 +684,14 @@ export function researchApiPlugin(): Plugin {
                   }
                 }
               }
+              markDone(job);
             });
 
             child.on('error', (err) => {
               job.status = 'error';
               job.message = `Claude CLI failed: ${err.message}`;
               addLog(job, 'error', job.message);
+              markDone(job);
             });
 
             res.statusCode = 202;
@@ -710,10 +732,13 @@ export function researchApiPlugin(): Plugin {
 
         // GET /api/research — list all jobs
         if (req.method === 'GET' && url.match(/^\/api\/research\/?(\?.*)?$/)) {
-          const all: Record<string, Omit<ResearchJob, 'writtenFiles'>> = {};
+          pruneOldJobs();
+          const all: Record<string, Omit<ResearchJob, 'writtenFiles'> & { slug?: string }> = {};
           for (const [id, j] of jobs) {
-            const { writtenFiles: _, ...jData } = j;
-            all[id] = jData;
+            const { writtenFiles, ...jData } = j;
+            const dataFiles = writtenFiles.filter(f => !f.includes('index.json') && f.endsWith('.json'));
+            const slug = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
+            all[id] = { ...jData, slug };
           }
           res.end(JSON.stringify({ jobs: all }));
           return;
@@ -750,6 +775,7 @@ export function researchApiPlugin(): Plugin {
                 logs: [],
                 lang,
                 writtenFiles: [],
+                mode: isUpdate ? 'update' : 'research',
               };
               jobs.set(jobId, job);
 
@@ -919,12 +945,14 @@ export function researchApiPlugin(): Plugin {
                     }
                   }
                 }
+                markDone(job);
               });
 
               child.on('error', (err) => {
                 job.status = 'error';
                 job.message = `Claude CLI failed: ${err.message}`;
                 addLog(job, 'error', job.message);
+                markDone(job);
               });
 
               res.statusCode = 202;

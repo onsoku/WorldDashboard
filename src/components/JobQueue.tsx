@@ -2,21 +2,14 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import { ResearchProgress } from './ResearchProgress';
 import { useTranslation } from '@/i18n/useTranslation';
-
-interface ActiveJob {
-  jobId: string;
-  topic: string;
-  startedAt: string;
-}
+import type { JobRecord } from '@/hooks/useJobs';
 
 interface JobQueueProps {
-  jobs: ActiveJob[];
-  onJobComplete: (jobId: string, slug?: string) => void;
-  onJobError: (jobId: string, message: string) => void;
-  onDismiss: (jobId: string) => void;
+  jobs: JobRecord[];
+  onDismiss?: (jobId: string) => void;
 }
 
-export function JobQueue({ jobs, onJobComplete, onJobError, onDismiss }: JobQueueProps) {
+export function JobQueue({ jobs, onDismiss }: JobQueueProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -48,17 +41,19 @@ export function JobQueue({ jobs, onJobComplete, onJobError, onDismiss }: JobQueu
               ? <ChevronRight className="w-3 h-3 flex-shrink-0" />
               : <ChevronDown className="w-3 h-3 flex-shrink-0" />}
             <span className="truncate flex-1 text-left">{job.topic}</span>
-            <X className="w-3 h-3 flex-shrink-0 theme-text-muted hover:theme-text"
-              onClick={e => { e.stopPropagation(); onDismiss(job.jobId); }} />
+            {onDismiss && (
+              <X className="w-3 h-3 flex-shrink-0 theme-text-muted hover:theme-text"
+                onClick={e => { e.stopPropagation(); onDismiss(job.jobId); }} />
+            )}
           </button>
           {!collapsed.has(job.jobId) && (
             <div className="px-1 pb-1">
               <ResearchProgress
-                jobId={job.jobId}
-                topic={job.topic}
+                status={job.status}
+                logs={job.logs}
                 startedAt={job.startedAt}
-                onComplete={(slug) => onJobComplete(job.jobId, slug)}
-                onError={(msg) => onJobError(job.jobId, msg)}
+                completedAt={job.completedAt}
+                message={job.message}
               />
             </div>
           )}

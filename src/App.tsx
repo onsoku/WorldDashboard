@@ -8,11 +8,13 @@ import { ExtensionRenderer } from '@/components/ExtensionRenderer';
 import { VersionHistory } from '@/components/VersionHistory';
 import { TranslateDialog } from '@/components/TranslateDialog';
 import { PdfExportDialog } from '@/components/PdfExportDialog';
+import { JobHistoryDialog } from '@/components/JobHistoryDialog';
 import { useResearchData } from '@/hooks/useResearchData';
+import { useJobs } from '@/hooks/useJobs';
 import { useTranslation } from '@/i18n/useTranslation';
 import { SettingsProvider, useSettings } from '@/context/SettingsContext';
 import { Loader2, Wrench, Trash2 } from 'lucide-react';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import type { ResearchData } from '@/types/research';
 
 /** Detect content language from overview text when meta.lang is not set. */
@@ -41,6 +43,14 @@ function Dashboard() {
   const { settings } = useSettings();
   const [drilldownRequest, setDrilldownRequest] = useState<{ topic: string; parentSlug: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+  const [showJobHistory, setShowJobHistory] = useState(false);
+
+  const jobs = useJobs({
+    onJobCompleted: async (job) => {
+      await refreshTopics();
+      if (job.slug) selectTopic(job.slug);
+    },
+  });
 
   const handleDrilldown = useCallback((topic: string) => {
     const existing = topics.find(tp =>
@@ -110,6 +120,7 @@ function Dashboard() {
       onUpdateConsumed={() => setUpdateRequest(null)}
       translateRequest={translateRequest}
       onTranslateConsumed={() => setTranslateRequest(null)}
+      runningJobs={jobs.running}
     />
   );
 
@@ -126,7 +137,17 @@ function Dashboard() {
   const currentVersionNum = (currentData?.versions?.length ?? 0) + 1;
 
   return (
-    <Layout sidebar={sidebar} topicName={currentData?.meta.topic} onExport={currentData ? handleExport : undefined} onExportPdf={currentData ? () => setShowPdfDialog(true) : undefined} onUpdate={currentData ? handleUpdate : undefined} onTranslate={currentData ? () => setShowTranslateDialog(true) : undefined}>
+    <Layout
+      sidebar={sidebar}
+      topicName={currentData?.meta.topic}
+      onExport={currentData ? handleExport : undefined}
+      onExportPdf={currentData ? () => setShowPdfDialog(true) : undefined}
+      onUpdate={currentData ? handleUpdate : undefined}
+      onTranslate={currentData ? () => setShowTranslateDialog(true) : undefined}
+      runningJobCount={jobs.runningCount}
+      unseenJobCount={jobs.unseenCount}
+      onOpenJobHistory={() => setShowJobHistory(true)}
+    >
       {isLoading && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--color-primary)' }} />
@@ -221,6 +242,17 @@ function Dashboard() {
           topics={topics}
           initialSlug={selectedSlug}
           onClose={() => setShowPdfDialog(false)}
+        />
+      )}
+      {showJobHistory && (
+        <JobHistoryDialog
+          jobs={jobs.jobs}
+          dismissedIds={jobs.dismissedIds}
+          onClose={() => setShowJobHistory(false)}
+          onDismiss={jobs.dismiss}
+          onRestore={jobs.restore}
+          onClearAll={jobs.clearAllCompleted}
+          onOpenTopic={selectTopic}
         />
       )}
     </Layout>
