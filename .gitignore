@@ -33,3 +33,7 @@ SESSIONS/
 
 # Claude Code temp files
 .claude/tmp/
+
+# Server-side observability + persistence (issues #24/#25/#26)
+.claude/logs/
+.claude/jobs/

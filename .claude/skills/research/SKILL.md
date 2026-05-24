@@ -235,16 +235,12 @@ https://api.semanticscholar.org/graph/v1/paper/search?query={URLエンコード�
 }
 ```
 
-1. Writeツールを使って `public/data/{slug}.json` にJSONを書き出す
-2. Readツールで `public/data/index.json` を読む
-   - ファイルが存在する場合: JSONをパースし、`topics`配列に新しいエントリを追加（同じslugがあれば上書き）
-   - ファイルが存在しない場合: 新しいindexを作成
-3. Writeツールで `public/data/index.json` を書き戻す
+1. Writeツールを使って `public/data/{slug}.json` にJSONを書き出す（**これ1ファイルのみ**）
 
-新しいトピックエントリの形式:
-```json
-{ "slug": "theme-slug", "topic": "テーマ名", "createdAt": "ISO 8601" }
-```
+**重要: `public/data/index.json` を読み書きしてはいけません。**
+サーバが `${slug}.json` の書き込みを検出すると、自動的に index.json を更新します（mutexで直列化）。
+CLI側で index.json を編集すると、並列実行中の他のジョブの追加分を上書きして消してしまい、これが Issue #26 の根本原因でした。
+index.json への Read/Write は不要・禁止です。サーバが処理します。
 
 ### Phase 6: 完了レポート
 

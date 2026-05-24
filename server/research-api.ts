@@ -2,6 +2,11 @@ import type { Plugin } from 'vite'
 import { spawn } from 'child_process'
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs'
 import path from 'path'
+import { log as slog } from './job-logger'
+import { updateIndex, removeFromIndex } from './index-writer'
+import {
+  loadAllJobs, persistJobDebounced, flushJob, deleteJob as deletePersistedJob,
+} from './job-store'
 
 interface LogEntry {
   timestamp: string;
@@ -10,6 +15,7 @@ interface LogEntry {
 }
 
 interface ResearchJob {
+  jobId: string;
   topic: string;
   status: 'running' | 'completed' | 'error';
   startedAt: string;
@@ -19,6 +25,9 @@ interface ResearchJob {
   lang: string;
   writtenFiles: string[];
   mode?: 'research' | 'translate' | 'update';
+  // Pre-known slug for translate/update modes; for fresh research it's
+  // derived from writtenFiles when the job completes.
+  slug?: string;
 }
 
 const LOG_MESSAGES: Record<string, Record<string, string>> = {
@@ -121,6 +130,79 @@ function toSlug(_topic: string): string {
 
 function addLog(job: ResearchJob, phase: LogEntry['phase'], message: string) {
   job.logs.push({ timestamp: new Date().toISOString(), phase, message });
+  persistJobDebounced(job.jobId, job);
+}
+
+/** Read meta.topic from a written data file. Falls back to null if missing. */
+function readTopicFromDataFile(slug: string): string | null {
+  try {
+    const p = path.join(process.cwd(), 'public', 'data', `${slug}.json`);
+    const raw = readFileSync(p, 'utf-8');
+    const data = JSON.parse(raw) as { meta?: { topic?: unknown } };
+    return typeof data.meta?.topic === 'string' ? data.meta.topic : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveSlug(job: ResearchJob): string | undefined {
+  if (job.slug) return job.slug;
+  const dataFiles = job.writtenFiles.filter(f => !f.includes('index.json') && f.endsWith('.json'));
+  if (dataFiles.length === 0) return undefined;
+  return path.basename(dataFiles[dataFiles.length - 1], '.json');
+}
+
+/**
+ * Called once a job reaches a terminal state. Logs exit, updates index.json
+ * via the mutex-protected writer, and flushes the persisted job to disk.
+ */
+async function finalizeJob(job: ResearchJob, exit: { code?: number | null; signal?: NodeJS.Signals | null; reason?: string }): Promise<void> {
+  markDone(job);
+  const slug = resolveSlug(job);
+  if (slug) job.slug = slug;
+
+  slog(job.status === 'error' ? 'warn' : 'info', 'job.exit', {
+    jobId: job.jobId,
+    topic: job.topic,
+    status: job.status,
+    mode: job.mode,
+    slug,
+    exitCode: exit.code ?? null,
+    signal: exit.signal ?? null,
+    reason: exit.reason,
+    durationMs: job.completedAt && job.startedAt
+      ? new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()
+      : null,
+    writtenFiles: job.writtenFiles.length,
+  });
+
+  if (job.status === 'completed' && slug) {
+    const topic = readTopicFromDataFile(slug) ?? job.topic;
+    try {
+      await updateIndex({
+        slug,
+        topic,
+        isUpdate: job.mode === 'update',
+        jobId: job.jobId,
+      });
+      addLog(job, 'writing', `index.json更新完了: ${slug}`);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      addLog(job, 'error', `index.json更新失敗: ${errMsg}`);
+      // Don't flip status to error — the data file was written; only the
+      // index update failed. Surface it in logs for triage.
+      slog('error', 'index.update_failed', { jobId: job.jobId, slug, error: errMsg });
+    }
+  } else if (job.status === 'completed' && !slug) {
+    slog('warn', 'job.completed_without_slug', {
+      jobId: job.jobId,
+      topic: job.topic,
+      writtenFiles: job.writtenFiles,
+    });
+    addLog(job, 'error', 'データファイルが見つかりませんでした (index.json更新スキップ)');
+  }
+
+  flushJob(job.jobId, job);
 }
 
 /**
@@ -163,6 +245,7 @@ function pruneOldJobs() {
   for (const [id, j] of jobs) {
     if (j.status !== 'running' && j.completedAt && new Date(j.completedAt).getTime() < cutoff) {
       jobs.delete(id);
+      deletePersistedJob(id);
     }
   }
 }
@@ -191,10 +274,15 @@ function parseStreamLine(line: string, job: ResearchJob) {
           } else if (toolName === 'Write') {
             const filePath: string = input.file_path ?? '';
             if (filePath.includes('index.json')) {
+              // The CLI is now instructed not to touch index.json. If we see
+              // this, the prompt failed — log it so we can tighten the prompt
+              // and so the user has evidence in #26 follow-ups.
+              slog('warn', 'cli.wrote_index', { jobId: job.jobId, filePath, topic: job.topic });
               addLog(job, 'writing', msg(L, 'index-write'));
             } else if (filePath.includes('.json')) {
               addLog(job, 'writing', msg(L, 'data-write'));
               job.writtenFiles.push(filePath);
+              slog('info', 'cli.wrote_data', { jobId: job.jobId, filePath });
             }
           } else if (toolName === 'Read') {
             const filePath: string = input.file_path ?? '';
@@ -226,21 +314,33 @@ function parseStreamLine(line: string, job: ResearchJob) {
         job.status = 'completed';
         job.message = `${msg(L, 'complete')}: ${job.topic}`;
         addLog(job, 'done', msg(L, 'done'));
-        markDone(job);
       } else if (event.subtype === 'error_max_turns') {
         job.status = 'completed';
         job.message = `${msg(L, 'complete')}: ${job.topic}`;
         addLog(job, 'done', msg(L, 'done-max'));
-        markDone(job);
       } else {
         job.status = 'error';
         job.message = (event.result as string | undefined)?.slice(0, 500) ?? `Error: ${event.subtype ?? 'unknown'}`;
         addLog(job, 'error', job.message);
-        markDone(job);
+        slog('warn', 'cli.result_error', {
+          jobId: job.jobId,
+          subtype: event.subtype,
+          message: job.message,
+        });
       }
+      // Don't call markDone here — finalizeJob is the single termination
+      // hook and handles index.json + persistence. The 'close' handler
+      // calls finalizeJob once the subprocess exits.
     }
-  } catch {
-    // Not valid JSON line, ignore
+  } catch (e) {
+    // The Claude CLI occasionally emits non-JSON debug lines. Log a sample
+    // (truncated) so we can tighten the parser if a real signal is being
+    // dropped, but stay at debug level to avoid noise.
+    slog('debug', 'stream.parse_error', {
+      jobId: job.jobId,
+      error: e instanceof Error ? e.message : String(e),
+      sample: line.slice(0, 200),
+    });
   }
 }
 
@@ -248,6 +348,18 @@ export function researchApiPlugin(): Plugin {
   return {
     name: 'research-api',
     configureServer(server) {
+      // Rehydrate persisted jobs from .claude/jobs so completed/error history
+      // and in-flight metadata survive Vite dev-server restarts (issue #24).
+      // Subprocesses are gone, so anything still 'running' on disk is marked
+      // as interrupted by loadAllJobs() before we see it here.
+      for (const { jobId, job } of loadAllJobs()) {
+        jobs.set(jobId, job as unknown as ResearchJob);
+      }
+      slog('info', 'plugin.ready', {
+        restoredJobs: jobs.size,
+        pid: process.pid,
+      });
+
       // Import API endpoint
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? '';
@@ -257,43 +369,34 @@ export function researchApiPlugin(): Plugin {
         let body = '';
         req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
         req.on('end', () => {
-          try {
-            const data = JSON.parse(body);
-            if (!data?.meta?.topic || !data?.meta?.slug) {
-              res.statusCode = 400;
-              res.end(JSON.stringify({ error: 'Invalid data: meta.topic and meta.slug are required' }));
-              return;
-            }
-
-            const slug: string = data.meta.slug;
-            const topic: string = data.meta.topic;
-            const projectRoot = process.cwd();
-            const dataDir = path.join(projectRoot, 'public', 'data');
-
-            // Write topic data
-            writeFileSync(path.join(dataDir, `${slug}.json`), JSON.stringify(data, null, 2), 'utf-8');
-
-            // Update index.json
-            let index: { topics: { slug: string; topic: string; createdAt: string }[] } = { topics: [] };
+          (async () => {
             try {
-              index = JSON.parse(readFileSync(path.join(dataDir, 'index.json'), 'utf-8'));
-            } catch { /* file doesn't exist yet */ }
+              const data = JSON.parse(body);
+              if (!data?.meta?.topic || !data?.meta?.slug) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: 'Invalid data: meta.topic and meta.slug are required' }));
+                return;
+              }
 
-            const existing = index.topics.findIndex(t => t.slug === slug);
-            const entry = { slug, topic, createdAt: data.meta.createdAt ?? new Date().toISOString() };
-            if (existing >= 0) {
-              index.topics[existing] = entry;
-            } else {
-              index.topics.push(entry);
+              const slug: string = data.meta.slug;
+              const topic: string = data.meta.topic;
+              const projectRoot = process.cwd();
+              const dataDir = path.join(projectRoot, 'public', 'data');
+
+              // Write topic data
+              writeFileSync(path.join(dataDir, `${slug}.json`), JSON.stringify(data, null, 2), 'utf-8');
+              // Route index.json updates through the shared mutex.
+              await updateIndex({ slug, topic });
+              slog('info', 'import.success', { slug, topic });
+
+              res.statusCode = 200;
+              res.end(JSON.stringify({ slug, topic, status: 'imported' }));
+            } catch (e) {
+              slog('warn', 'import.failed', { error: e instanceof Error ? e.message : String(e) });
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Invalid JSON' }));
             }
-            writeFileSync(path.join(dataDir, 'index.json'), JSON.stringify(index, null, 2), 'utf-8');
-
-            res.statusCode = 200;
-            res.end(JSON.stringify({ slug, topic, status: 'imported' }));
-          } catch {
-            res.statusCode = 400;
-            res.end(JSON.stringify({ error: 'Invalid JSON' }));
-          }
+          })().catch(() => { /* response already sent */ });
         });
       });
 
@@ -316,26 +419,21 @@ export function researchApiPlugin(): Plugin {
           return;
         }
 
-        try {
-          // Remove the JSON file
-          if (existsSync(filePath)) {
-            unlinkSync(filePath);
+        (async () => {
+          try {
+            if (existsSync(filePath)) {
+              unlinkSync(filePath);
+            }
+            await removeFromIndex(slug);
+            slog('info', 'topic.delete', { slug });
+            res.statusCode = 200;
+            res.end(JSON.stringify({ slug, status: 'deleted' }));
+          } catch (e) {
+            slog('error', 'topic.delete_failed', { slug, error: e instanceof Error ? e.message : String(e) });
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: `Delete failed: ${e instanceof Error ? e.message : String(e)}` }));
           }
-
-          // Remove from index.json
-          const indexPath = path.join(dataDir, 'index.json');
-          if (existsSync(indexPath)) {
-            const index = JSON.parse(readFileSync(indexPath, 'utf-8'));
-            index.topics = (index.topics ?? []).filter((t: { slug: string }) => t.slug !== slug);
-            writeFileSync(indexPath, JSON.stringify(index, null, 2), 'utf-8');
-          }
-
-          res.statusCode = 200;
-          res.end(JSON.stringify({ slug, status: 'deleted' }));
-        } catch (e) {
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: `Delete failed: ${e instanceof Error ? e.message : String(e)}` }));
-        }
+        })().catch(() => { /* response already sent */ });
       });
 
       // Repair topic API endpoint
@@ -555,6 +653,7 @@ export function researchApiPlugin(): Plugin {
             const targetLangName = LANG_NAMES[targetLang] ?? targetLang;
 
             const job: ResearchJob = {
+              jobId,
               topic: `${sourceTopic} → ${targetLangName}`,
               status: 'running',
               startedAt: new Date().toISOString(),
@@ -562,9 +661,14 @@ export function researchApiPlugin(): Plugin {
               lang: targetLang,
               writtenFiles: [],
               mode: 'translate',
+              slug: newSlug,
             };
             jobs.set(jobId, job);
             addLog(job, 'start', `${msg(targetLang, 'start')}: ${sourceTopic} → ${targetLangName}`);
+            slog('info', 'job.start', {
+              jobId, mode: 'translate', topic: job.topic,
+              sourceSlug, targetLang, newSlug,
+            });
 
             const tmpDir = path.join(projectRoot, '.claude', 'tmp');
             mkdirSync(tmpDir, { recursive: true });
@@ -618,10 +722,14 @@ export function researchApiPlugin(): Plugin {
               '',
               'Follow the skill instructions below for JSON output format:',
               '',
+              // Same index.json guard as the research prompt (issue #26).
+              'CRITICAL: DO NOT read or write public/data/index.json. The server updates index.json automatically once your data file is written.',
+              '',
               skillInstructions,
               '',
               `IMPORTANT: Write output files to ${dataDir.replace(/\\/g, '/')}`,
               `Output slug must be "${newSlug}"`,
+              'IMPORTANT: Only write the single data file. Do not touch index.json.',
             ].join('\n');
 
             writeFileSync(promptFile, systemPrompt, 'utf-8');
@@ -657,9 +765,15 @@ export function researchApiPlugin(): Plugin {
             });
 
             let stderrBuffer = '';
-            child.stderr?.on('data', (data: Buffer) => { stderrBuffer += data.toString(); });
+            child.stderr?.on('data', (data: Buffer) => {
+              const chunk = data.toString();
+              stderrBuffer += chunk;
+              // Record full stderr in the log file (truncated job.message
+              // already drops anything past 300 chars).
+              slog('debug', 'cli.stderr', { jobId, chunk: chunk.slice(0, 1000) });
+            });
 
-            child.on('close', (code) => {
+            child.on('close', (code, signal) => {
               if (stdoutBuffer.trim()) parseStreamLine(stdoutBuffer.trim(), job);
               if (job.status === 'running') {
                 if (code === 0) {
@@ -684,14 +798,15 @@ export function researchApiPlugin(): Plugin {
                   }
                 }
               }
-              markDone(job);
+              void finalizeJob(job, { code, signal, reason: 'subprocess close' });
             });
 
             child.on('error', (err) => {
               job.status = 'error';
               job.message = `Claude CLI failed: ${err.message}`;
               addLog(job, 'error', job.message);
-              markDone(job);
+              slog('error', 'cli.spawn_error', { jobId, error: err.message });
+              void finalizeJob(job, { reason: 'spawn error' });
             });
 
             res.statusCode = 202;
@@ -710,7 +825,13 @@ export function researchApiPlugin(): Plugin {
 
         res.setHeader('Content-Type', 'application/json');
 
-        console.log(`[research-api] ${req.method} ${url} (jobs: ${jobs.size})`);
+        // Skip the per-2s GET /api/research heartbeat — it produces ~43k
+        // lines/day otherwise. Still log every POST + every job-specific GET
+        // so we can correlate failures with client activity.
+        const isHeartbeat = req.method === 'GET' && /^\/api\/research\/?(\?.*)?$/.test(url);
+        if (!isHeartbeat) {
+          slog('info', 'http.request', { method: req.method, url, jobCount: jobs.size });
+        }
 
         // GET /api/research/:jobId — get specific job status + logs
         const jobIdMatch = url.match(/^\/api\/research\/(.+?)(?:\?.*)?$/);
@@ -722,23 +843,27 @@ export function researchApiPlugin(): Plugin {
             res.end(JSON.stringify({ error: 'Job not found' }));
             return;
           }
-          const { writtenFiles, ...jobData } = job;
-          // Derive slug from the last written data file (excluding index.json)
+          // Strip writtenFiles + jobId (jobId is the response key already)
+          // and re-derive slug from the last written data file as a fallback
+          // for jobs that didn't pre-set job.slug.
+          const { writtenFiles, jobId: _omit, ...jobData } = job;
+          void _omit;
           const dataFiles = writtenFiles.filter(f => !f.includes('index.json') && f.endsWith('.json'));
-          const lastFile = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
-          res.end(JSON.stringify({ jobId, ...jobData, slug: lastFile }));
+          const derived = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
+          res.end(JSON.stringify({ jobId, ...jobData, slug: jobData.slug ?? derived }));
           return;
         }
 
         // GET /api/research — list all jobs
         if (req.method === 'GET' && url.match(/^\/api\/research\/?(\?.*)?$/)) {
           pruneOldJobs();
-          const all: Record<string, Omit<ResearchJob, 'writtenFiles'> & { slug?: string }> = {};
+          const all: Record<string, Omit<ResearchJob, 'writtenFiles' | 'jobId'> & { slug?: string }> = {};
           for (const [id, j] of jobs) {
-            const { writtenFiles, ...jData } = j;
+            const { writtenFiles, jobId: _omit, ...jData } = j;
+            void _omit;
             const dataFiles = writtenFiles.filter(f => !f.includes('index.json') && f.endsWith('.json'));
-            const slug = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
-            all[id] = { ...jData, slug };
+            const derived = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
+            all[id] = { ...jData, slug: jData.slug ?? derived };
           }
           res.end(JSON.stringify({ jobs: all }));
           return;
@@ -769,6 +894,7 @@ export function researchApiPlugin(): Plugin {
               }
 
               const job: ResearchJob = {
+                jobId,
                 topic,
                 status: 'running',
                 startedAt: new Date().toISOString(),
@@ -776,10 +902,17 @@ export function researchApiPlugin(): Plugin {
                 lang,
                 writtenFiles: [],
                 mode: isUpdate ? 'update' : 'research',
+                slug: isUpdate ? existingSlug : undefined,
               };
               jobs.set(jobId, job);
 
               addLog(job, 'start', `${msg(lang, 'start')}: ${topic}`);
+              slog('info', 'job.start', {
+                jobId, mode: job.mode, topic, lang,
+                parentSlug: parentSlug ?? null,
+                existingSlug: isUpdate ? existingSlug : null,
+                concurrentRunning: running.length + 1,
+              });
 
               const projectRoot = process.cwd();
 
@@ -866,9 +999,15 @@ export function researchApiPlugin(): Plugin {
                 '',
                 'EFFICIENCY: Minimize tool calls while maintaining quality. Run WebSearch calls in parallel where possible. Use Semantic Scholar limit=20 to reduce API calls. Only WebFetch pages when search snippets lack sufficient detail (max 3 fetches). Write the final JSON in a single Write call.',
                 '',
+                // Race-condition guard (issue #26): when multiple jobs run in
+                // parallel the CLI used to read-modify-write index.json and
+                // stomp each other. The server now owns index.json updates.
+                'CRITICAL: DO NOT read or write public/data/index.json. The server updates index.json automatically once your data file is written. Writing index.json yourself will be detected and overridden, and may corrupt parallel jobs.',
+                '',
                 skillInstructions,
                 '',
                 `IMPORTANT: Write output files to ${dataDir}`,
+                'IMPORTANT: Only write the single ${slug}.json data file. Do not touch index.json.',
                 `REMINDER: Write all content in ${langName}.`,
               ].join('\n');
 
@@ -912,10 +1051,12 @@ export function researchApiPlugin(): Plugin {
 
               let stderrBuffer = '';
               child.stderr?.on('data', (data: Buffer) => {
-                stderrBuffer += data.toString();
+                const chunk = data.toString();
+                stderrBuffer += chunk;
+                slog('debug', 'cli.stderr', { jobId, chunk: chunk.slice(0, 1000) });
               });
 
-              child.on('close', (code) => {
+              child.on('close', (code, signal) => {
                 // Process remaining buffer
                 if (stdoutBuffer.trim()) {
                   parseStreamLine(stdoutBuffer.trim(), job);
@@ -945,14 +1086,15 @@ export function researchApiPlugin(): Plugin {
                     }
                   }
                 }
-                markDone(job);
+                void finalizeJob(job, { code, signal, reason: 'subprocess close' });
               });
 
               child.on('error', (err) => {
                 job.status = 'error';
                 job.message = `Claude CLI failed: ${err.message}`;
                 addLog(job, 'error', job.message);
-                markDone(job);
+                slog('error', 'cli.spawn_error', { jobId, error: err.message });
+                void finalizeJob(job, { reason: 'spawn error' });
               });
 
               res.statusCode = 202;
