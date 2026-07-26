@@ -39,3 +39,9 @@ SESSIONS/
 # Server-side observability + persistence (issues #24/#25/#26)
 .claude/logs/
 .claude/jobs/
+
+# Copies of topics taken before an intentional overwrite (issue #42)
+.claude/trash/
+
+# Per-job directory the CLI writes into before the server places the file (#42)
+.staging/

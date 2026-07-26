@@ -65,7 +65,29 @@ slug からファイルパスを組み立てる箇所を新設する場合も同
 正規表現による除去に戻してはいけない。属性付きの `<script >` や
 `<use href="data:...">`、`<animate onbegin=...>` を取りこぼす（[#34](https://github.com/onsoku/WorldDashboard/issues/34)）。
 
-### 5. ジョブが 'running' のままサーバが落ちたら error に倒す
+### 5. CLI は `public/data` に直接書かない。配置はサーバが行う
+
+CLI の出力先はジョブ専用の `.staging/{jobId}/` で、`public/data/` へ移すのは
+`placeJobOutput()`（`server/research-api.ts`）だけ。
+`server/data-placement.ts` が配置と衝突判定を担当する。
+
+以前は CLI が `public/data/{slug}.json` を直接書いていたため、新規調査が既存 slug に
+当たると警告もバックアップもなく上書きされた（[#42](https://github.com/onsoku/WorldDashboard/issues/42)。
+実際に WebAssembly 辞典を1件失っている）。**書かれてから気付いても手遅れ**なので、
+検出ではなく配置の主導権をサーバに移すことで解決している。
+
+衝突ポリシー:
+
+- 新規調査 (`mode: research`) — 既存ファイルには触らない。空いている `{slug}-2` に置き、
+  `meta.slug` もそれに合わせて書き換える。`job.slug_collision` を warn ログに出す
+- 更新 / 翻訳 — slug はジョブが所有しているので上書きしてよい。ただし直前に
+  `.claude/trash/{slug}-{timestamp}.json` へ退避する
+- パースできない JSON も配置する。修復 UI は `public/data` にあるファイルしか触れない
+
+**ステージングを `.claude/` 配下に置いてはいけない。** Claude Code が sensitive file として
+書き込みを拒否し、ジョブがターン上限まで無駄にリトライする。
+
+### 6. ジョブが 'running' のままサーバが落ちたら error に倒す
 
 `server/job-store.ts` の `loadAllJobs()` が起動時に変換する。
 サブプロセスは既に消えているので、実行中として復元してはいけない
@@ -84,6 +106,11 @@ slug からファイルパスを組み立てる箇所を新設する場合も同
 | `cli.wrote_data` | CLI がデータファイルを書いた |
 | `cli.wrote_index` | **不変条件1の違反。** プロンプトが効いていない |
 | `cli.result_error` / `cli.stderr` / `cli.spawn_error` | CLI 側の失敗 |
+| `cli.wrote_outside_staging` | **不変条件5の違反。** ステージング外に書いている |
+| `job.slug_collision` | 新規調査の slug が既存と衝突し、別名で保存した |
+| `job.backup_before_overwrite` | 更新・翻訳の上書き前に `.claude/trash/` へ退避した |
+| `job.no_staged_output` | ステージングに何も無い。Write が拒否された可能性 |
+| `job.place_failed` | 配置に失敗（slug が不正など） |
 | `index.update` / `index.write` / `index.read_failed` | index.json の更新 |
 | `job.restored` / `job.restored_as_interrupted` | 起動時のジョブ復元 |
 | `json.auto_repaired` / `json.unrepairable` | 生成 JSON の修復結果 |
@@ -154,12 +181,6 @@ API は Vite の `configureServer` プラグインに同居させたままにす
 UI は `repair.truncated` で警告する。自動修復（conservative）は従来どおり
 切り詰めに触らない。戻すときは `json-repair.test.ts` の truncation 10形状を見ること。
 
-### slug 衝突で既存辞典が消える
-
-新規調査 (`mode: research`) が既存 slug に当たると、警告もバックアップもなく上書きされ、
-`versions` の履歴も失われる（[#42](https://github.com/onsoku/WorldDashboard/issues/42)）。
-**検証目的でジョブを投入する前に、必ず `index.json` の既存 slug を確認すること。**
-
 ### effect 内での setState
 
 `react-hooks/set-state-in-effect` を5箇所で `eslint-disable` している。
@@ -173,9 +194,12 @@ UI は `repair.truncated` で警告する。自動修復（conservative）は従
 .claude/logs/server.jsonl         # 構造化ログ (gitignore)
 .claude/jobs/*.json               # ジョブ永続化 (gitignore)
 .claude/tmp/prompt-*.txt          # CLI へ渡すプロンプト (gitignore、掃除は #32)
+.claude/trash/                    # 上書き前の退避コピー (gitignore)
+.staging/{jobId}/                 # CLI の出力先。配置後に削除 (gitignore)
 server/
   research-api.ts                 # Vite プラグイン本体。全 API エンドポイント
   index-writer.ts                 # index.json の唯一の書き手 (mutex)
+  data-placement.ts               # ステージング → public/data の配置と衝突判定
   job-store.ts                    # ジョブの永続化と復元
   job-logger.ts                   # 構造化ログ
   json-repair.ts                  # 生成 JSON の検証・修復

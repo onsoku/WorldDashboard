@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite'
 import { spawn } from 'child_process'
-import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, rmSync } from 'fs'
 import path from 'path'
 import { log as slog } from './job-logger'
 import { updateIndex, removeFromIndex } from './index-writer'
@@ -9,6 +9,7 @@ import {
 } from './job-store'
 import { isValidSlug, resolveDataPath } from './slug'
 import { repairJsonFile, repairJsonString } from './json-repair'
+import { listStagedFiles, placeStagedFile } from './data-placement'
 
 interface LogEntry {
   timestamp: string;
@@ -30,6 +31,10 @@ interface ResearchJob {
   // Pre-known slug for translate/update modes; for fresh research it's
   // derived from writtenFiles when the job completes.
   slug?: string;
+  // Per-job directory the CLI writes into. The server moves the result into
+  // public/data itself so a slug collision can be caught before it destroys
+  // an existing topic (#42). Absent for jobs restored from before this existed.
+  stagingDir?: string;
 }
 
 const LOG_MESSAGES: Record<string, Record<string, string>> = {
@@ -138,6 +143,12 @@ function addLog(job: ResearchJob, phase: LogEntry['phase'], message: string) {
   persistJobDebounced(job.jobId, job);
 }
 
+/** True when child resolves to a path inside dir. Tolerates mixed separators. */
+function isInside(dir: string, child: string): boolean {
+  const rel = path.relative(path.resolve(dir), path.resolve(child));
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
 /** Read meta.topic from a written data file. Falls back to null if missing. */
 function readTopicFromDataFile(slug: string): string | null {
   try {
@@ -224,6 +235,83 @@ function validateAndRepairJson(filePath: string): { valid: boolean; repaired?: b
   return { valid: result.valid, repaired: result.repaired, error: result.error };
 }
 
+function validateAndRepairLogged(job: ResearchJob, filePath: string): void {
+  const { valid, repaired, error: jsonErr } = validateAndRepairJson(filePath);
+  const filename = path.basename(filePath);
+  if (repaired) {
+    addLog(job, 'writing', `JSON自動修復: ${filename}`);
+  } else if (!valid) {
+    addLog(job, 'error', `JSONバリデーションエラー (${filename}): ${jsonErr}`);
+  }
+}
+
+/**
+ * Move what the job staged into public/data, then point writtenFiles at the
+ * final locations so resolveSlug() and the index update see them.
+ *
+ * Runs before finalizeJob. A job whose CLI ignored the staging instruction and
+ * wrote straight into public/data keeps its original writtenFiles — by then
+ * there is nothing left to protect, so the only useful thing is a loud log.
+ */
+function placeJobOutput(job: ResearchJob, stagingDir: string, dataDir: string): void {
+  const staged = listStagedFiles(stagingDir);
+
+  if (staged.length === 0) {
+    if (job.writtenFiles.length > 0) {
+      slog('warn', 'job.no_staged_output', {
+        jobId: job.jobId, stagingDir, writtenFiles: job.writtenFiles,
+      });
+    }
+    // A Write the CLI announced is not a Write that happened — it can be
+    // denied, and then the path exists only in the event stream. Keeping it
+    // would let resolveSlug() name a file nobody wrote and stamp the matching
+    // index entry as updated.
+    job.writtenFiles = job.writtenFiles.filter((fp) => existsSync(fp));
+    for (const fp of job.writtenFiles) validateAndRepairLogged(job, fp);
+    return;
+  }
+
+  const trashDir = path.join(process.cwd(), '.claude', 'trash');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const placed: string[] = [];
+
+  for (const stagedPath of staged) {
+    validateAndRepairLogged(job, stagedPath);
+    try {
+      // Fresh research lets the CLI choose the slug, so it may collide. Update
+      // and translate own their slug and overwrite it on purpose.
+      const result = placeStagedFile({
+        stagedPath,
+        dataDir,
+        trashDir,
+        expectedSlug: job.mode === 'research' ? undefined : job.slug,
+        stamp,
+      });
+      placed.push(result.path);
+
+      if (result.collidedWith) {
+        slog('warn', 'job.slug_collision', {
+          jobId: job.jobId, requested: result.collidedWith, savedAs: result.slug,
+        });
+        addLog(job, 'writing',
+          `slug「${result.collidedWith}」は既存の辞典が使用中のため、「${result.slug}」として保存しました`);
+      }
+      if (result.backup) {
+        slog('info', 'job.backup_before_overwrite', {
+          jobId: job.jobId, slug: result.slug, backup: result.backup,
+        });
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      slog('error', 'job.place_failed', { jobId: job.jobId, stagedPath, error: errMsg });
+      addLog(job, 'error', `データファイルの配置に失敗しました: ${errMsg}`);
+    }
+  }
+
+  if (placed.length > 0) job.writtenFiles = placed;
+  rmSync(stagingDir, { recursive: true, force: true });
+}
+
 function markDone(job: ResearchJob) {
   if (!job.completedAt) job.completedAt = new Date().toISOString();
 }
@@ -262,6 +350,16 @@ function parseStreamLine(line: string, job: ResearchJob) {
             }
           } else if (toolName === 'Write') {
             const filePath: string = input.file_path ?? '';
+            // Everything the job writes belongs in its staging directory so
+            // the server controls placement (#42). Checked for every write,
+            // not just .json: a CLI whose destination is denied improvises,
+            // and one run left a 34KB .mjs at the repo root that would have
+            // written the data file itself.
+            if (job.stagingDir && filePath && !isInside(job.stagingDir, filePath)) {
+              slog('warn', 'cli.wrote_outside_staging', {
+                jobId: job.jobId, filePath, stagingDir: job.stagingDir,
+              });
+            }
             if (filePath.includes('index.json')) {
               // The CLI is now instructed not to touch index.json. If we see
               // this, the prompt failed — log it so we can tighten the prompt
@@ -632,6 +730,11 @@ export function researchApiPlugin(): Plugin {
 
             const newSlug = `${sourceSlug}-${targetLang}`;
             const jobId = newJobPrefix() + '-' + Date.now();
+            // Same staging rule as research (#42). A re-translation overwrites
+            // its own slug on purpose, but only after the previous file has
+            // been copied aside and the new one has been checked.
+            const stagingDir = path.join(projectRoot, '.staging', jobId);
+            mkdirSync(stagingDir, { recursive: true });
 
             const LANG_NAMES: Record<string, string> = {
               ja: 'Japanese', en: 'English', zh: 'Chinese (Simplified)',
@@ -649,6 +752,7 @@ export function researchApiPlugin(): Plugin {
               writtenFiles: [],
               mode: 'translate',
               slug: newSlug,
+              stagingDir,
             };
             jobs.set(jobId, job);
             addLog(job, 'start', `${msg(targetLang, 'start')}: ${sourceTopic} → ${targetLangName}`);
@@ -714,7 +818,10 @@ export function researchApiPlugin(): Plugin {
               '',
               skillInstructions,
               '',
-              `IMPORTANT: Write output files to ${dataDir.replace(/\\/g, '/')}`,
+              // Overrides the skill text, which says to write into public/data
+              // (#42) — the server moves the file there after checking it.
+              `IMPORTANT: Write output files to ${stagingDir.replace(/\\/g, '/')}`,
+              'IMPORTANT: Ignore any instruction above to write into public/data. Write the single data file into the directory named on the previous line. The server moves it into public/data once it has been checked.',
               `Output slug must be "${newSlug}"`,
               'IMPORTANT: Only write the single data file. Do not touch index.json.',
             ].join('\n');
@@ -773,17 +880,8 @@ export function researchApiPlugin(): Plugin {
                   addLog(job, 'error', job.message);
                 }
               }
-              // Validate written JSON files after translation completes
-              if (job.status === 'completed' && job.writtenFiles.length > 0) {
-                for (const fp of job.writtenFiles) {
-                  const { valid, repaired, error: jsonErr } = validateAndRepairJson(fp);
-                  const filename = path.basename(fp);
-                  if (repaired) {
-                    addLog(job, 'writing', `JSON自動修復: ${filename}`);
-                  } else if (!valid) {
-                    addLog(job, 'error', `JSONバリデーションエラー (${filename}): ${jsonErr}`);
-                  }
-                }
+              if (job.status === 'completed') {
+                placeJobOutput(job, stagingDir, dataDir);
               }
               void finalizeJob(job, { code, signal, reason: 'subprocess close' });
             });
@@ -830,11 +928,12 @@ export function researchApiPlugin(): Plugin {
             res.end(JSON.stringify({ error: 'Job not found' }));
             return;
           }
-          // Strip writtenFiles + jobId (jobId is the response key already)
-          // and re-derive slug from the last written data file as a fallback
-          // for jobs that didn't pre-set job.slug.
-          const { writtenFiles, jobId: _omit, ...jobData } = job;
+          // Strip server-side bookkeeping (writtenFiles, stagingDir) and jobId
+          // (jobId is the response key already), then re-derive slug from the
+          // last written data file for jobs that didn't pre-set job.slug.
+          const { writtenFiles, jobId: _omit, stagingDir: _staging, ...jobData } = job;
           void _omit;
+          void _staging;
           const dataFiles = writtenFiles.filter(f => !f.includes('index.json') && f.endsWith('.json'));
           const derived = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
           res.end(JSON.stringify({ jobId, ...jobData, slug: jobData.slug ?? derived }));
@@ -844,10 +943,11 @@ export function researchApiPlugin(): Plugin {
         // GET /api/research — list all jobs
         if (req.method === 'GET' && url.match(/^\/api\/research\/?(\?.*)?$/)) {
           pruneOldJobs();
-          const all: Record<string, Omit<ResearchJob, 'writtenFiles' | 'jobId'> & { slug?: string }> = {};
+          const all: Record<string, Omit<ResearchJob, 'writtenFiles' | 'jobId' | 'stagingDir'> & { slug?: string }> = {};
           for (const [id, j] of jobs) {
-            const { writtenFiles, jobId: _omit, ...jData } = j;
+            const { writtenFiles, jobId: _omit, stagingDir: _staging, ...jData } = j;
             void _omit;
+            void _staging;
             const dataFiles = writtenFiles.filter(f => !f.includes('index.json') && f.endsWith('.json'));
             const derived = dataFiles.length > 0 ? path.basename(dataFiles[dataFiles.length - 1], '.json') : undefined;
             all[id] = { ...jData, slug: jData.slug ?? derived };
@@ -890,6 +990,16 @@ export function researchApiPlugin(): Plugin {
                 return;
               }
 
+              const projectRoot = process.cwd();
+              // The CLI writes here, not into public/data. finalizeJob does the
+              // move, which is the only place a slug collision can still be
+              // caught before it overwrites an existing topic (#42).
+              // Not under .claude/ — the CLI refuses to write there
+              // ("sensitive file"), which leaves the job retrying until it
+              // runs out of turns.
+              const stagingDir = path.join(projectRoot, '.staging', jobId);
+              mkdirSync(stagingDir, { recursive: true });
+
               const job: ResearchJob = {
                 jobId,
                 topic,
@@ -900,6 +1010,7 @@ export function researchApiPlugin(): Plugin {
                 writtenFiles: [],
                 mode: isUpdate ? 'update' : 'research',
                 slug: isUpdate ? existingSlug : undefined,
+                stagingDir,
               };
               jobs.set(jobId, job);
 
@@ -910,8 +1021,6 @@ export function researchApiPlugin(): Plugin {
                 existingSlug: isUpdate ? existingSlug : null,
                 concurrentRunning: running.length + 1,
               });
-
-              const projectRoot = process.cwd();
 
               // Write prompt to a temp file to avoid shell escaping issues
               const tmpDir = path.join(projectRoot, '.claude', 'tmp');
@@ -1003,8 +1112,11 @@ export function researchApiPlugin(): Plugin {
                 '',
                 skillInstructions,
                 '',
-                `IMPORTANT: Write output files to ${dataDir}`,
-                'IMPORTANT: Only write the single ${slug}.json data file. Do not touch index.json.',
+                // Overrides the skill text, which says to write into
+                // public/data. The server moves the file there itself so that
+                // a slug collision cannot destroy an existing topic (#42).
+                `IMPORTANT: Write output files to ${stagingDir.replace(/\\/g, '/')}`,
+                'IMPORTANT: Ignore any instruction above to write into public/data. Write the single ${slug}.json file into the directory named on the previous line and nothing else. The server moves it into public/data once it has been checked.',
                 `REMINDER: Write all content in ${langName}.`,
               ].join('\n');
 
@@ -1071,17 +1183,8 @@ export function researchApiPlugin(): Plugin {
                     addLog(job, 'error', job.message);
                   }
                 }
-                // Validate only the JSON files written by this job
-                if (job.status === 'completed' && job.writtenFiles.length > 0) {
-                  for (const fp of job.writtenFiles) {
-                    const { valid, repaired, error: jsonErr } = validateAndRepairJson(fp);
-                    const filename = path.basename(fp);
-                    if (repaired) {
-                      addLog(job, 'writing', `JSON自動修復: ${filename}`);
-                    } else if (!valid) {
-                      addLog(job, 'error', `JSONバリデーションエラー (${filename}): ${jsonErr}`);
-                    }
-                  }
+                if (job.status === 'completed') {
+                  placeJobOutput(job, stagingDir, path.join(projectRoot, 'public', 'data'));
                 }
                 void finalizeJob(job, { code, signal, reason: 'subprocess close' });
               });
