@@ -118,13 +118,24 @@ npx tsc -b           # 型チェック
 
 ## 既知の設計判断と制約
 
-### API が Vite プラグインに同居している
+### ローカルツールとして固める（決定済み）
 
-`npm run build` した `dist/` は**閲覧専用**で、調査・翻訳・PDF出力・削除は動かない。
-ローカルツールとして固めるか `server/` を独立プロセスに切り出すかは
-[#36](https://github.com/onsoku/WorldDashboard/issues/36) で未決。
-[#38](https://github.com/onsoku/WorldDashboard/issues/38)（ジョブ制御）と
-[#41](https://github.com/onsoku/WorldDashboard/issues/41)（SSE）の実装方針はこの決定に依存する。
+**このプロジェクトはローカルツールである。製品化しない**
+（[#36](https://github.com/onsoku/WorldDashboard/issues/36) で決定）。
+
+API は Vite の `configureServer` プラグインに同居させたままにする。
+`npm run build` した `dist/` は既存トピックの**閲覧専用**で、
+調査・翻訳・PDF出力・削除は `npm run dev` でしか動かない。これは制約ではなく仕様。
+
+したがって:
+
+- `server/` を Express / Hono の独立プロセスに切り出す提案はしない
+- 認証・マルチユーザー・リモートのデータ保存先は考慮しない。単一ユーザーのローカル前提
+- 新機能は dev サーバ内で完結する形で設計する。
+  [#38](https://github.com/onsoku/WorldDashboard/issues/38)（ジョブ制御）は
+  in-process のジョブレジストリで、
+  [#41](https://github.com/onsoku/WorldDashboard/issues/41)（SSE）は
+  同じ Vite middleware で実装する
 
 ### JSON 修復は「開いた構造を閉じる」方式
 

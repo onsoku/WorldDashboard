@@ -79,6 +79,8 @@ npm run dev
 
 Open http://localhost:5173
 
+> **World Dashboard is a local tool.** The research API lives inside the Vite dev server (`server/research-api.ts`), so research, translation, PDF export, and deletion require `npm run dev`. `npm run build` produces a **read-only** viewer of the topics you already have — it cannot create new ones.
+
 ## Usage
 
 1. Click **"+ New"** in the sidebar

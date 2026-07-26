@@ -54,6 +54,8 @@ npm run dev
 
 在浏览器中打开 http://localhost:5173
 
+> **World Dashboard 是本地工具。** 研究 API 位于 Vite 开发服务器内部（`server/research-api.ts`），因此研究、翻译、PDF 导出和删除仅在 `npm run dev` 下可用。`npm run build` 生成的 `dist/` 仅供**浏览**已有主题，无法创建新主题。
+
 ## 使用方法
 
 1. 点击侧栏的 **"+ 新建"**

@@ -54,6 +54,8 @@ npm run dev
 
 Apri http://localhost:5173 nel browser
 
+> **World Dashboard e uno strumento locale.** L'API di ricerca vive dentro il server di sviluppo Vite (`server/research-api.ts`), quindi ricerca, traduzione, esportazione PDF ed eliminazione richiedono `npm run dev`. `npm run build` produce un visualizzatore di **sola lettura** degli argomenti esistenti; non puo crearne di nuovi.
+
 ## Utilizzo
 
 1. Clicca **"+ Nuovo"** nella barra laterale

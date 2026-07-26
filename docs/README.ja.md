@@ -58,6 +58,8 @@ npm run dev
 
 ブラウザで http://localhost:5173 を開く
 
+> **World Dashboard はローカルツールです。** 調査 API は Vite の dev サーバ内 (`server/research-api.ts`) にあるため、調査・翻訳・PDF出力・削除は `npm run dev` でのみ動作します。`npm run build` で生成される `dist/` は既存トピックの**閲覧専用**で、新規作成はできません。
+
 ## 使い方
 
 1. サイドバーの **「+ 新規」** をクリック
