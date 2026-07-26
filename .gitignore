@@ -34,6 +34,9 @@ SESSIONS/
 # Claude Code temp files
 .claude/tmp/
 
+# Claude Code local settings (per-machine permission allowlist)
+.claude/settings.local.json
+
 # Server-side observability + persistence (issues #24/#25/#26)
 .claude/logs/
 .claude/jobs/
