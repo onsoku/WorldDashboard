@@ -14,11 +14,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      # package-lock.json is gitignored (see issue #30), so npm ci is not
-      # available yet. Switch this to `npm ci` with cache: npm once the lock
-      # file is tracked.
-      - run: npm install
+      # npm ci, not npm install: the lock file is what keeps CI resolving the
+      # same dependency tree as a developer machine. Before it was tracked
+      # (#30), CI picked up a newer eslint-plugin-react-hooks and failed on
+      # three lint errors that did not reproduce locally.
+      - run: npm ci
 
       - name: Typecheck
         run: npx tsc -b

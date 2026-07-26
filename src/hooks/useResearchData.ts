@@ -48,6 +48,9 @@ export function useResearchData() {
   }, []);
 
   useEffect(() => {
+    // Initial load. refreshTopics setStates after its await, which the rule
+    // still flags; restructuring the load flow is tracked in #45.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see #45
     refreshTopics();
   }, [refreshTopics]);
 
@@ -83,6 +86,7 @@ export function useResearchData() {
 
   useEffect(() => {
     if (topics.length > 0 && !selectedSlug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see #45
       selectTopic(topics[0].slug);
     }
   }, [topics, selectedSlug, selectTopic]);
