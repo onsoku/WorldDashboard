@@ -7,6 +7,7 @@ import { updateIndex, removeFromIndex } from './index-writer'
 import {
   loadAllJobs, persistJobDebounced, flushJob, deleteJob as deletePersistedJob,
 } from './job-store'
+import { isValidSlug, resolveDataPath } from './slug'
 
 interface LogEntry {
   timestamp: string;
@@ -383,8 +384,19 @@ export function researchApiPlugin(): Plugin {
               const projectRoot = process.cwd();
               const dataDir = path.join(projectRoot, 'public', 'data');
 
+              // meta.slug comes straight from an uploaded file, so it is fully
+              // attacker-controlled — validate before it ever reaches the
+              // filesystem (issue #35).
+              const targetPath = resolveDataPath(dataDir, slug);
+              if (!targetPath) {
+                slog('warn', 'import.invalid_slug', { slug: String(slug).slice(0, 100) });
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: `Invalid slug: ${slug}` }));
+                return;
+              }
+
               // Write topic data
-              writeFileSync(path.join(dataDir, `${slug}.json`), JSON.stringify(data, null, 2), 'utf-8');
+              writeFileSync(targetPath, JSON.stringify(data, null, 2), 'utf-8');
               // Route index.json updates through the shared mutex.
               await updateIndex({ slug, topic });
               slog('info', 'import.success', { slug, topic });
@@ -410,10 +422,9 @@ export function researchApiPlugin(): Plugin {
         const slug = decodeURIComponent(deleteMatch[1]);
         const projectRoot = process.cwd();
         const dataDir = path.join(projectRoot, 'public', 'data');
-        const filePath = path.join(dataDir, `${slug}.json`);
 
-        // Validate slug to prevent path traversal
-        if (slug.includes('..') || slug.includes('/') || slug.includes('\\')) {
+        const filePath = resolveDataPath(dataDir, slug);
+        if (!filePath) {
           res.statusCode = 400;
           res.end(JSON.stringify({ error: 'Invalid slug' }));
           return;
@@ -446,9 +457,9 @@ export function researchApiPlugin(): Plugin {
         const slug = decodeURIComponent(repairMatch[1]);
         const projectRoot = process.cwd();
         const dataDir = path.join(projectRoot, 'public', 'data');
-        const filePath = path.join(dataDir, `${slug}.json`);
 
-        if (slug.includes('..') || slug.includes('/') || slug.includes('\\')) {
+        const filePath = resolveDataPath(dataDir, slug);
+        if (!filePath) {
           res.statusCode = 400;
           res.end(JSON.stringify({ error: 'Invalid slug' }));
           return;
@@ -541,13 +552,14 @@ export function researchApiPlugin(): Plugin {
           const projectRoot = process.cwd();
           const dataDir = path.join(projectRoot, 'public', 'data');
           for (const s of slugs) {
-            if (typeof s !== 'string' || s.includes('..') || s.includes('/') || s.includes('\\')) {
+            const dataPath = resolveDataPath(dataDir, s);
+            if (!dataPath) {
               res.statusCode = 400;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ error: `Invalid slug: ${s}` }));
               return;
             }
-            if (!existsSync(path.join(dataDir, `${s}.json`))) {
+            if (!existsSync(dataPath)) {
               res.statusCode = 404;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ error: `Unknown slug: ${s}` }));
@@ -617,6 +629,13 @@ export function researchApiPlugin(): Plugin {
             if (!sourceSlug || !targetLang) {
               res.statusCode = 400;
               res.end(JSON.stringify({ error: 'sourceSlug and targetLang are required' }));
+              return;
+            }
+            // sourceSlug is read from disk and embedded in the CLI prompt, so an
+            // unvalidated value leaks arbitrary files into the request (#35).
+            if (!isValidSlug(sourceSlug)) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: `Invalid slug: ${sourceSlug}` }));
               return;
             }
 
@@ -881,6 +900,16 @@ export function researchApiPlugin(): Plugin {
                 return;
               }
               const lang: string = language ?? 'ja';
+              if (existingSlug !== undefined && !isValidSlug(existingSlug)) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: `Invalid slug: ${existingSlug}` }));
+                return;
+              }
+              if (parentSlug !== undefined && parentSlug !== '' && !isValidSlug(parentSlug)) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ error: `Invalid slug: ${parentSlug}` }));
+                return;
+              }
               const isUpdate = mode === 'update' && existingSlug;
 
               const jobId = toSlug(topic) + '-' + Date.now();
