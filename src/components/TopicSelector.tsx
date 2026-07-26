@@ -2,7 +2,7 @@ import { RefreshCw, Search, Plus, Upload, Trash2 } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { TopicEntry } from '@/types/research';
 import { useTranslation } from '@/i18n/useTranslation';
-import { useSettings } from '@/context/SettingsContext';
+import { useSettings } from '@/context/settings-context';
 import { JobQueue } from './JobQueue';
 import type { JobRecord } from '@/hooks/useJobs';
 
@@ -58,8 +58,13 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
 
   const handleStartResearch = () => { startResearch(newTopic); };
 
+  // Drilldown and update arrive as one-shot request props from App, so they
+  // are consumed here in an effect. Both consume callbacks setState in the
+  // parent, which the lint rule flags as a cascading render. Restructuring
+  // this to dispatch from the event handler instead is tracked in issue #45.
   useEffect(() => {
     if (drilldownRequest) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see #45
       startResearch(drilldownRequest.topic, { parentSlug: drilldownRequest.parentSlug });
       onDrilldownConsumed?.();
     }
@@ -67,6 +72,7 @@ export function TopicSelector({ topics, selectedSlug, onSelect, onRefresh, drill
 
   useEffect(() => {
     if (updateRequest) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see #45
       startResearch(updateRequest.topic, { mode: 'update', slug: updateRequest.slug });
       onUpdateConsumed?.();
     }

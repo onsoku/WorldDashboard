@@ -1,4 +1,4 @@
-import { useSettings } from '@/context/SettingsContext';
+import { useSettings } from '@/context/settings-context';
 import translations from './translations';
 
 export function useTranslation() {

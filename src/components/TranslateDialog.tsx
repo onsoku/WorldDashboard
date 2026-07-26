@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Languages, X } from 'lucide-react';
 import { useTranslation } from '@/i18n/useTranslation';
-import type { Language } from '@/context/SettingsContext';
+import type { Language } from '@/context/settings-context';
 
 interface TranslateDialogProps {
   contentLang?: string;

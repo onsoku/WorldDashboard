@@ -12,30 +12,11 @@ import { JobHistoryDialog } from '@/components/JobHistoryDialog';
 import { useResearchData } from '@/hooks/useResearchData';
 import { useJobs } from '@/hooks/useJobs';
 import { useTranslation } from '@/i18n/useTranslation';
-import { SettingsProvider, useSettings } from '@/context/SettingsContext';
+import { SettingsProvider } from '@/context/SettingsContext';
+import { useSettings } from '@/context/settings-context';
 import { Loader2, Wrench, Trash2 } from 'lucide-react';
 import { useState, useCallback } from 'react';
-import type { ResearchData } from '@/types/research';
-
-/** Detect content language from overview text when meta.lang is not set. */
-function detectContentLang(data: ResearchData): string | undefined {
-  const text = data.overview?.summary ?? data.overview?.keyFindings?.[0] ?? '';
-  if (!text) return undefined;
-  // CJK character ranges: ideographs / kana / hangul
-  const cjk = text.match(/[\u3000-\u9fff\uf900-\ufaff]/g)?.length ?? 0;
-  const kana = text.match(/[\u3040-\u309f\u30a0-\u30ff]/g)?.length ?? 0;
-  const total = text.length;
-  if (total === 0) return undefined;
-  if (kana > 0 && (cjk + kana) / total > 0.1) return 'ja';
-  if (cjk / total > 0.1) return 'zh';
-  // Latin-script heuristics via common words
-  const lower = text.toLowerCase();
-  if (/\b(the|and|is|of|in)\b/.test(lower)) return 'en';
-  if (/\b(el|la|los|las|es|de|en)\b/.test(lower)) return 'es';
-  if (/\b(le|la|les|des|est|et)\b/.test(lower)) return 'fr';
-  if (/\b(il|la|le|di|che|è)\b/.test(lower)) return 'it';
-  return undefined;
-}
+import { detectContentLang } from '@/lib/detectContentLang';
 
 function Dashboard() {
   const { topics, selectedSlug, currentData, isLoading, error, refreshTopics, selectTopic, deleteTopic, repairTopic } = useResearchData();

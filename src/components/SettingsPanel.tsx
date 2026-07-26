@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Settings, Sun, Moon, Monitor } from 'lucide-react';
-import { useSettings, type Theme, type Language } from '@/context/SettingsContext';
+import { useSettings, type Theme, type Language } from '@/context/settings-context';
 import { useTranslation } from '@/i18n/useTranslation';
 
 const THEME_OPTIONS: { value: Theme; icon: typeof Sun; key: string }[] = [

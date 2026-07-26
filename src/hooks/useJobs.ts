@@ -45,8 +45,13 @@ export function useJobs({ onJobCompleted }: UseJobsOptions = {}) {
   const [jobs, setJobs] = useState<Record<string, JobRecord>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed());
   const prevStatusRef = useRef<Record<string, 'running' | 'completed' | 'error'>>({});
+  // Latest-ref pattern: the polling effect must see the current callback
+  // without re-subscribing, but the assignment has to happen after render
+  // rather than during it.
   const onCompletedRef = useRef(onJobCompleted);
-  onCompletedRef.current = onJobCompleted;
+  useEffect(() => {
+    onCompletedRef.current = onJobCompleted;
+  }, [onJobCompleted]);
 
   useEffect(() => {
     let cancelled = false;

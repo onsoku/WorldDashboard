@@ -8,6 +8,7 @@ import {
   loadAllJobs, persistJobDebounced, flushJob, deleteJob as deletePersistedJob,
 } from './job-store'
 import { isValidSlug, resolveDataPath } from './slug'
+import { repairJsonFile, repairJsonString } from './json-repair'
 
 interface LogEntry {
   timestamp: string;
@@ -124,8 +125,11 @@ function msg(lang: string, key: string): string {
 
 const jobs = new Map<string, ResearchJob>();
 
-function toSlug(_topic: string): string {
-  // Use a random ID to avoid URL encoding issues with non-ASCII characters
+/**
+ * Generate a job id prefix. Deliberately ignores the topic — deriving it from
+ * non-ASCII topic text caused URL encoding problems, so it is purely random.
+ */
+function newJobPrefix(): string {
   return 'job-' + Math.random().toString(36).slice(2, 10);
 }
 
@@ -207,33 +211,17 @@ async function finalizeJob(job: ResearchJob, exit: { code?: number | null; signa
 }
 
 /**
- * Validate a JSON file written by Claude CLI and attempt to repair common issues.
- * Returns true if the file is valid (or was successfully repaired).
+ * Validate a JSON file written by Claude CLI and repair common issues in
+ * place. Conservative by design — see server/json-repair.ts.
  */
 function validateAndRepairJson(filePath: string): { valid: boolean; repaired?: boolean; error?: string } {
-  if (!existsSync(filePath)) return { valid: false, error: 'File not found' };
-  const raw = readFileSync(filePath, 'utf-8');
-  try {
-    JSON.parse(raw);
-    return { valid: true };
-  } catch (e) {
-    const errMsg = e instanceof SyntaxError ? e.message : String(e);
-    // Attempt repair: fix common issues from LLM-generated JSON
-    try {
-      let fixed = raw;
-      // Remove trailing commas before } or ]
-      fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
-      // Remove control characters inside strings (except \n \r \t which are valid escaped)
-      fixed = fixed.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
-      JSON.parse(fixed);
-      writeFileSync(filePath, fixed, 'utf-8');
-      console.log(`[research-api] Auto-repaired JSON: ${filePath}`);
-      return { valid: true, repaired: true };
-    } catch {
-      console.warn(`[research-api] Invalid JSON in ${filePath}: ${errMsg}`);
-      return { valid: false, error: errMsg };
-    }
+  const result = repairJsonFile(filePath);
+  if (result.repaired) {
+    slog('info', 'json.auto_repaired', { filePath });
+  } else if (!result.valid) {
+    slog('warn', 'json.invalid', { filePath, error: result.error });
   }
+  return { valid: result.valid, repaired: result.repaired, error: result.error };
 }
 
 function markDone(job: ResearchJob) {
@@ -472,56 +460,27 @@ export function researchApiPlugin(): Plugin {
         }
 
         const raw = readFileSync(filePath, 'utf-8');
+        // The user asked for this repair explicitly, so allow the aggressive
+        // strategies (unescaped newlines, truncation recovery).
+        const result = repairJsonString(raw, { aggressive: true });
 
-        // First check if it's already valid
-        try {
-          JSON.parse(raw);
+        if (result.valid && !result.repaired) {
           res.statusCode = 200;
           res.end(JSON.stringify({ slug, status: 'already_valid' }));
           return;
-        } catch { /* needs repair */ }
+        }
 
-        // Attempt repair with multiple strategies
-        let fixed = raw;
-        try {
-          // Strategy 1: Remove trailing commas
-          fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
-          // Strategy 2: Remove control characters
-          fixed = fixed.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
-          // Strategy 3: Fix unescaped newlines in strings
-          fixed = fixed.replace(/(?<=:\s*"[^"]*)\n(?=[^"]*")/g, '\\n');
-          // Strategy 4: Truncate at last valid closing brace if JSON is truncated
-          try {
-            JSON.parse(fixed);
-          } catch (e2) {
-            if (e2 instanceof SyntaxError && e2.message.includes('end of JSON input')) {
-              // JSON is truncated — find the last complete object
-              const lastBrace = fixed.lastIndexOf('}');
-              if (lastBrace > 0) {
-                // Try progressively truncating to find valid JSON
-                for (let i = lastBrace; i >= 0; i--) {
-                  if (fixed[i] === '}') {
-                    const candidate = fixed.slice(0, i + 1);
-                    try {
-                      JSON.parse(candidate);
-                      fixed = candidate;
-                      break;
-                    } catch { /* try next */ }
-                  }
-                }
-              }
-            }
-          }
-
-          JSON.parse(fixed);
-          writeFileSync(filePath, fixed, 'utf-8');
-          console.log(`[research-api] Repaired JSON: ${filePath}`);
+        if (result.valid && result.fixed !== undefined) {
+          writeFileSync(filePath, result.fixed, 'utf-8');
+          slog('info', 'json.repaired', { slug, filePath });
           res.statusCode = 200;
           res.end(JSON.stringify({ slug, status: 'repaired' }));
-        } catch {
-          res.statusCode = 422;
-          res.end(JSON.stringify({ slug, status: 'unrepairable', error: 'Automatic repair failed. Consider deleting this topic.' }));
+          return;
         }
+
+        slog('warn', 'json.unrepairable', { slug, error: result.error });
+        res.statusCode = 422;
+        res.end(JSON.stringify({ slug, status: 'unrepairable', error: 'Automatic repair failed. Consider deleting this topic.' }));
       });
 
       // Export PDF API endpoint — bundles one or more topics into a single PDF.
@@ -663,7 +622,7 @@ export function researchApiPlugin(): Plugin {
             }
 
             const newSlug = `${sourceSlug}-${targetLang}`;
-            const jobId = toSlug('translate') + '-' + Date.now();
+            const jobId = newJobPrefix() + '-' + Date.now();
 
             const LANG_NAMES: Record<string, string> = {
               ja: 'Japanese', en: 'English', zh: 'Chinese (Simplified)',
@@ -912,7 +871,7 @@ export function researchApiPlugin(): Plugin {
               }
               const isUpdate = mode === 'update' && existingSlug;
 
-              const jobId = toSlug(topic) + '-' + Date.now();
+              const jobId = newJobPrefix() + '-' + Date.now();
 
               const MAX_CONCURRENT = 3;
               const running = [...jobs.values()].filter(j => j.status === 'running');

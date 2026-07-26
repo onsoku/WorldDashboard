@@ -36,7 +36,7 @@ const sanitizeSchema = {
 function fixCjkEmphasis(text: string): string {
   return text.split('\n').map(line => {
     // Skip code fences and indented code blocks
-    if (/^(```|~~~|    |\t)/.test(line)) return line;
+    if (/^(```|~~~| {4}|\t)/.test(line)) return line;
     // Split on inline code spans so we never touch content inside backticks
     const parts = line.split(/(`[^`]+`)/g);
     return parts.map((part, i) => {

@@ -1,4 +1,4 @@
-import type { Language } from '@/context/SettingsContext';
+import type { Language } from '@/context/settings-context';
 
 const translations: Record<Language, Record<string, string>> = {
   ja: {

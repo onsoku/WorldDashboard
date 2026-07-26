@@ -1,39 +1,8 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-
-export type Theme = 'light' | 'dark' | 'mono';
-export type Language = 'en' | 'ja' | 'zh' | 'es' | 'it' | 'fr';
-
-interface Settings {
-  theme: Theme;
-  language: Language;
-}
-
-interface SettingsContextType {
-  settings: Settings;
-  setTheme: (theme: Theme) => void;
-  setLanguage: (language: Language) => void;
-}
-
-const STORAGE_KEY = 'world-dashboard-settings';
-
-const defaultSettings: Settings = { theme: 'light', language: 'ja' };
-
-function loadSettings(): Settings {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return { ...defaultSettings, ...parsed };
-    }
-  } catch { /* ignore */ }
-  return defaultSettings;
-}
-
-function saveSettings(settings: Settings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
-const SettingsContext = createContext<SettingsContextType | null>(null);
+import { useState, useEffect, type ReactNode } from 'react';
+import {
+  SettingsContext, loadSettings, saveSettings,
+  type Settings, type Theme, type Language,
+} from '@/context/settings-context';
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>(loadSettings);
@@ -51,10 +20,4 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       {children}
     </SettingsContext.Provider>
   );
-}
-
-export function useSettings() {
-  const ctx = useContext(SettingsContext);
-  if (!ctx) throw new Error('useSettings must be used within SettingsProvider');
-  return ctx;
 }
