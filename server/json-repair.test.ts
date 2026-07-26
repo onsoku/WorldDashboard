@@ -74,20 +74,66 @@ describe('repairJsonString - aggressive (explicit user repair)', () => {
     expect(repairJsonString('<<<not json>>>', { aggressive: true }).valid).toBe(false)
   })
 
-  // Known defect, tracked in issue #44. Truncation recovery only runs when the
-  // parser says "Unexpected end of JSON input", and even then it walks back to
-  // a '}' that always leaves the root object unclosed. None of the shapes real
-  // CLI truncation produces are recovered. These assertions pin the current
-  // (broken) behaviour so the fix for #44 shows up as a visible change.
-  const truncationShapes: [string, string][] = [
-    ['truncated after a key', '{"meta":{"a":1},"overview":'],
-    ['truncated mid-string', '{"meta":{"a":1},"ov":{"s":"ha'],
-    ['missing only the final brace', '{"meta":{"a":1},"ov":{"s":"x"}'],
-    ['truncated after a value', '{"meta":{"a":1},"ov":2'],
-    ['array root truncated', '[{"a":1},{"b"'],
+  // The shapes real CLI truncation produces (#44). Before the fix none of
+  // these recovered: the strategy only ran on "Unexpected end of JSON input"
+  // and walked back to a '}' that left the root object unclosed.
+  const truncationShapes: [string, string, unknown][] = [
+    ['truncated after a key', '{"meta":{"a":1},"overview":', { meta: { a: 1 } }],
+    ['truncated mid-string', '{"meta":{"a":1},"ov":{"s":"ha', { meta: { a: 1 }, ov: { s: 'ha' } }],
+    ['missing only the final brace', '{"meta":{"a":1},"ov":{"s":"x"}', { meta: { a: 1 }, ov: { s: 'x' } }],
+    ['truncated after a value', '{"meta":{"a":1},"ov":2', { meta: { a: 1 }, ov: 2 }],
+    ['array root truncated', '[{"a":1},{"b"', [{ a: 1 }]],
+    ['truncated mid-key', '{"a":1,"titl', { a: 1 }],
+    ['trailing commentary after the root', '{"a":1}' + NL + NL + 'I ran out of turns.', { a: 1 }],
+    ['truncated inside a nested array', '{"a":[1,2,3', { a: [1, 2, 3] }],
+    ['truncated on a dangling escape', '{"a":"x\\', { a: 'x' }],
+    ['truncated inside a unicode escape', '{"a":"x\\u00', { a: 'x' }],
   ]
 
-  it.each(truncationShapes)('does not yet recover: %s (#44)', (_name, raw) => {
-    expect(repairJsonString(raw, { aggressive: true }).valid).toBe(false)
+  it.each(truncationShapes)('recovers: %s (#44)', (_name, raw, expected) => {
+    const r = repairJsonString(raw, { aggressive: true })
+    expect(r.valid).toBe(true)
+    expect(r.truncated).toBe(true)
+    expect(JSON.parse(r.fixed as string)).toEqual(expected)
+  })
+
+  it('reports how much the recovery dropped', () => {
+    const r = repairJsonString('{"meta":{"a":1},"overview":"' + 'x'.repeat(50), { aggressive: true })
+    expect(r.valid).toBe(true)
+    // The tail was inside a string, so closing it kept everything.
+    expect(r.droppedChars).toBe(0)
+
+    const r2 = repairJsonString('{"meta":{"a":1},"overview":', { aggressive: true })
+    expect(r2.droppedChars).toBe('"overview":'.length + 1) // + the separating comma
+  })
+
+  it('does not flag a non-truncation repair as truncated', () => {
+    const r = repairJsonString('{"a":[1,2,],}', { aggressive: true })
+    expect(r.valid).toBe(true)
+    expect(r.truncated).toBeUndefined()
+  })
+
+  it('refuses to salvage a document with nothing complete at the root', () => {
+    // Recovery here could only produce '{}', which would silently replace the
+    // topic with an empty document.
+    expect(repairJsonString('{"meta":{"topic":', { aggressive: true }).valid).toBe(false)
+    expect(repairJsonString('{"meta', { aggressive: true }).valid).toBe(false)
+  })
+
+  it('keeps the completed part of a realistic cut-off document', () => {
+    const raw = JSON.stringify({
+      meta: { topic: '量子コンピューティング', slug: 'quantum' },
+      sections: [{ title: 'A', body: 'done' }],
+    })
+    // Cut mid-way through a second section, the way --max-turns leaves it.
+    const cut = raw.slice(0, raw.lastIndexOf(']')) + ',{"title":"B","body":"半分だけ書'
+    const r = repairJsonString(cut, { aggressive: true })
+    expect(r.valid).toBe(true)
+    const doc = JSON.parse(r.fixed as string)
+    expect(doc.meta.topic).toBe('量子コンピューティング')
+    expect(doc.sections).toEqual([
+      { title: 'A', body: 'done' },
+      { title: 'B', body: '半分だけ書' },
+    ])
   })
 })

@@ -143,8 +143,13 @@ function Dashboard() {
               <button
                 onClick={async () => {
                   const result = await repairTopic(selectedSlug);
-                  if (result === 'repaired' || result === 'already_valid') {
-                    // selectTopic is called inside repairTopic
+                  if (result.status === 'repaired' || result.status === 'already_valid') {
+                    // selectTopic is called inside repairTopic.
+                    // A truncated recovery parses but is missing content, so
+                    // say so rather than letting it look like a clean repair.
+                    if (result.truncated) {
+                      alert(t('repair.truncated').replace('{n}', String(result.droppedChars ?? 0)));
+                    }
                   } else {
                     alert(t('repair.failed'));
                   }

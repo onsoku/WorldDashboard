@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ResearchData, TopicEntry } from '@/types/research';
 
+export interface RepairOutcome {
+  status: 'repaired' | 'already_valid' | 'unrepairable' | 'error';
+  /** The file was cut off mid-write; it parses now but content is missing. */
+  truncated?: boolean;
+  /** Roughly how many characters the repair could not salvage. */
+  droppedChars?: number;
+}
+
 export function useResearchData() {
   const [topics, setTopics] = useState<TopicEntry[]>([]);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
@@ -70,17 +78,17 @@ export function useResearchData() {
     }
   }, [selectedSlug, refreshTopics]);
 
-  const repairTopic = useCallback(async (slug: string): Promise<'repaired' | 'already_valid' | 'unrepairable' | 'error'> => {
+  const repairTopic = useCallback(async (slug: string): Promise<RepairOutcome> => {
     try {
       const res = await fetch(`/api/repair/${encodeURIComponent(slug)}`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         await selectTopic(slug);
-        return data.status;
+        return { status: data.status, truncated: data.truncated, droppedChars: data.droppedChars };
       }
-      return data.status ?? 'error';
+      return { status: data.status ?? 'error' };
     } catch {
-      return 'error';
+      return { status: 'error' };
     }
   }, [selectTopic]);
 

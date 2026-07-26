@@ -472,9 +472,18 @@ export function researchApiPlugin(): Plugin {
 
         if (result.valid && result.fixed !== undefined) {
           writeFileSync(filePath, result.fixed, 'utf-8');
-          slog('info', 'json.repaired', { slug, filePath });
+          slog('info', 'json.repaired', {
+            slug, filePath, truncated: result.truncated, droppedChars: result.droppedChars,
+          });
           res.statusCode = 200;
-          res.end(JSON.stringify({ slug, status: 'repaired' }));
+          // truncated means the document was cut off mid-write: it parses now,
+          // but content is missing and the UI has to say so.
+          res.end(JSON.stringify({
+            slug,
+            status: 'repaired',
+            truncated: result.truncated ?? false,
+            droppedChars: result.droppedChars ?? 0,
+          }));
           return;
         }
 

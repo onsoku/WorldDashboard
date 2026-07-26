@@ -126,12 +126,22 @@ npx tsc -b           # 型チェック
 [#38](https://github.com/onsoku/WorldDashboard/issues/38)（ジョブ制御）と
 [#41](https://github.com/onsoku/WorldDashboard/issues/41)（SSE）の実装方針はこの決定に依存する。
 
-### JSON 修復は切り詰めを直せない
+### JSON 修復は「開いた構造を閉じる」方式
 
-`server/json-repair.ts` の truncation 戦略は、実際の切り詰め方では一度も発火しない
-（[#44](https://github.com/onsoku/WorldDashboard/issues/44)）。
-`--max-turns` 到達で書きかけになった JSON は現状復旧できない。
-現在の挙動は `json-repair.test.ts` に「まだ復旧できない」ケースとして固定してある。
+`server/json-repair.ts` の truncation 復旧は、末尾を切り捨てるのではなく
+未閉じの構造を閉じる（[#44](https://github.com/onsoku/WorldDashboard/issues/44)）。
+`scanStructure()` が文字列状態とコンテナのスタックを1パスで取り、
+
+1. 全部残して閉じる（開いたままの文字列を閉じ、スタックを逆順に閉じる）
+2. 失敗したら直近のカンマ区切りまで巻き戻す（内側から外へ。中身が確定していない
+   コンテナは空 `{}` を残さずコンテナごと捨てる）
+
+の順に試す。**ルートに確定した中身が無い場合は復旧を拒否する。**
+`{}` でファイルを上書きするのは失敗を報告するより悪い。
+
+復旧できても内容は欠けているので `truncated` / `droppedChars` を返し、
+UI は `repair.truncated` で警告する。自動修復（conservative）は従来どおり
+切り詰めに触らない。戻すときは `json-repair.test.ts` の truncation 10形状を見ること。
 
 ### slug 衝突で既存辞典が消える
 
