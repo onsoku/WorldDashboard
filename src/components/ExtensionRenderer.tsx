@@ -9,6 +9,7 @@ import { MarkdownContent } from '@/components/MarkdownContent';
 import { MapContainer, TileLayer, Marker as LeafletMarker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import DOMPurify from 'dompurify';
 import { useMemo } from 'react';
 import type { Extension, ChartSeries } from '@/types/research';
 
@@ -264,18 +265,22 @@ function MapRenderer({ ext }: { ext: Extract<Extension, { type: 'map' }> }) {
   );
 }
 
+/**
+ * Diagram SVG is written by the LLM from web-sourced material, so it is
+ * untrusted markup going straight into the DOM. The previous regex-based strip
+ * missed attribute-bearing tags (`<script >`), `<use href="data:...">` and
+ * SMIL handlers such as `<animate onbegin=...>`; DOMPurify's SVG profile is an
+ * allow-list instead of a deny-list (issue #34).
+ */
 function sanitizeSvg(raw: string): string {
-  // Remove script tags, event handlers, and foreign objects
-  let svg = raw
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
-    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
-    .replace(/javascript\s*:/gi, '');
-  // Ensure it's wrapped in an <svg> tag
-  if (!svg.trim().startsWith('<svg')) {
-    svg = `<svg xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
-  }
-  return svg;
+  const svg = raw.trim().startsWith('<svg')
+    ? raw
+    : `<svg xmlns="http://www.w3.org/2000/svg">${raw}</svg>`;
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    // <foreignObject> re-opens the HTML parser inside SVG — keep it out.
+    FORBID_TAGS: ['foreignObject'],
+  });
 }
 
 function DiagramRenderer({ ext }: { ext: Extract<Extension, { type: 'diagram' }> }) {
